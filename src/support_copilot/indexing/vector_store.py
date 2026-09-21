@@ -1,0 +1,35 @@
+"""Own the persistent Chroma client and explicit full-rebuild behavior."""
+
+import chromadb
+from llama_index.vector_stores.chroma import ChromaVectorStore
+
+
+COLLECTION_NAME = "technical_evidence"
+
+# Explicit, not cosmetic: Chroma defaults to "l2" (squared Euclidean) when unset. That only ranks
+# the same as cosine similarity because the current embedding model (nomic-embed-text) happens to
+# emit unit-normalized vectors — an assumption this constant now makes explicit instead of leaving
+# incidental. See docs/learning/vector-similarity-scoring.md. `hnsw:space` is fixed at collection
+# creation time, so changing it requires a full rebuild (`ingest_documents.py --force`), not just
+# a code change.
+DISTANCE_SPACE = "cosine"
+
+
+def get_collection(config, *, reset: bool = False):
+    """Return the Chroma collection, optionally replacing all generated vectors."""
+
+    config.storage_dir.mkdir(parents=True, exist_ok=True)
+    client = chromadb.PersistentClient(path=str(config.storage_dir / "chroma_db"))
+    if reset:
+        try:
+            client.delete_collection(COLLECTION_NAME)
+        except Exception:
+            # Chroma raises when the collection does not yet exist; first-run ingestion is healthy.
+            pass
+    return client.get_or_create_collection(COLLECTION_NAME, metadata={"hnsw:space": DISTANCE_SPACE})
+
+
+def get_vector_store(config, *, reset: bool = False):
+    """Wrap Chroma in the adapter expected by LlamaIndex."""
+
+    return ChromaVectorStore(chroma_collection=get_collection(config, reset=reset))

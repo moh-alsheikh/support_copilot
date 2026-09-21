@@ -1,0 +1,21 @@
+.env
+.venv/
+.DS_Store
+__pycache__/
+*.pyc
+.pytest_cache/
+storage/
+chroma_db/
+reports/*.csv
+reports/*.md
+evaluation/reports/*.csv
+evaluation/reports/*.md
+data/raw/**
+# Curated sample corpus ships with the repo; anything else you drop under data/raw/ stays ignored.
+!data/raw/lumen_user_guide.md
+!data/raw/support_faq.md
+!data/raw/support_policy.txt
+data/processed/*.jsonl
+data/metadata/*.csv
+evaluation/reports/**/*.csv
+evaluation/reports/**/*.json

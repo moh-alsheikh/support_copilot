@@ -1,0 +1,13 @@
+Lumen Refund And Support Policy
+
+Refund window: full refunds are available within 30 days of the original purchase date for annual
+plans, and within 14 days for monthly plans.
+
+Support response time: paid plans receive a first response within 1 business day. Free plan
+support is best-effort through the community forum only.
+
+Data retention after cancellation: files remain stored for 90 days after subscription
+cancellation, then are permanently deleted.
+
+Account deletion: deleting a Lumen account is permanent after a 30-day grace period and cannot be
+reversed once the grace period ends.

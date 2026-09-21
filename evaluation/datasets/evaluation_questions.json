@@ -1,0 +1,47 @@
+[
+  {
+    "question_id": "Q001",
+    "question": "How do I reset my password?",
+    "expected_answer": "Click \"Forgot password\" on the sign-in page and follow the email link; reset links expire after 24 hours.",
+    "expected_sources": ["support_faq.md"],
+    "expected_locations": ["lines:3-5"],
+    "question_type": "supported",
+    "notes": "Update the location if the sample source changes."
+  },
+  {
+    "question_id": "Q002",
+    "question": "How much storage does the Pro plan include?",
+    "expected_answer": "1 TB",
+    "expected_sources": ["lumen_user_guide.md"],
+    "expected_locations": ["lines:21-22"],
+    "question_type": "supported",
+    "notes": "Checks grounded evidence from a line-addressable Markdown source."
+  },
+  {
+    "question_id": "Q003",
+    "question": "What is the refund window for an annual plan?",
+    "expected_answer": "30 days from the original purchase date",
+    "expected_sources": ["support_policy.txt"],
+    "expected_locations": ["lines:3-4"],
+    "question_type": "supported",
+    "notes": "Checks grounded evidence from a second, distinct source file."
+  },
+  {
+    "question_id": "Q004",
+    "question": "How long are files retained after I cancel my subscription?",
+    "expected_answer": "90 days",
+    "expected_sources": ["support_policy.txt"],
+    "expected_locations": ["lines:9-10"],
+    "question_type": "supported",
+    "notes": "Second fact from the same source file at a different location."
+  },
+  {
+    "question_id": "Q005",
+    "question": "Does Lumen Sync support two-factor authentication?",
+    "expected_answer": "",
+    "expected_sources": [],
+    "expected_locations": [],
+    "question_type": "unsupported",
+    "notes": "The sample corpus does not provide this value."
+  }
+]
