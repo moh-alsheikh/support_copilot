@@ -27,3 +27,4 @@ data/processed/*.jsonl
 data/metadata/*.csv
 evaluation/reports/**/*.csv
 evaluation/reports/**/*.json
+.claude/
