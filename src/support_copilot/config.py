@@ -37,7 +37,8 @@ class AppConfig:
     llm_model: str
     embedding_model: str
     anthropic_api_key: str = ""
-    anthropic_model: str = "claude-sonnet-4-5"
+    anthropic_model: str = "claude-sonnet-5-5"
+    collection_name: str = "technical_evidence"
     request_timeout: float = 360.0
     top_k: int = 4
     chunk_size: int = 512
@@ -67,6 +68,7 @@ class AppConfig:
             embedding_model=os.getenv("OLLAMA_EMBEDDING_MODEL", "nomic-embed-text:latest"),
             anthropic_api_key=os.getenv("ANTHROPIC_API_KEY", ""),
             anthropic_model=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5"),
+            collection_name=os.getenv("COLLECTION_NAME", "technical_evidence"),
             request_timeout=float(os.getenv("OLLAMA_REQUEST_TIMEOUT", "360")),
             top_k=int(os.getenv("TOP_K", "4")),
             chunk_size=int(os.getenv("CHUNK_SIZE", "512")),

@@ -4,7 +4,7 @@ import chromadb
 from llama_index.vector_stores.chroma import ChromaVectorStore
 
 
-COLLECTION_NAME = "technical_evidence"
+# COLLECTION_NAME = "technical_evidence"
 
 # Explicit, not cosmetic: Chroma defaults to "l2" (squared Euclidean) when unset. That only ranks
 # the same as cosine similarity because the current embedding model (nomic-embed-text) happens to
@@ -22,11 +22,11 @@ def get_collection(config, *, reset: bool = False):
     client = chromadb.PersistentClient(path=str(config.storage_dir / "chroma_db"))
     if reset:
         try:
-            client.delete_collection(COLLECTION_NAME)
+            client.delete_collection(config.collection_name)
         except Exception:
             # Chroma raises when the collection does not yet exist; first-run ingestion is healthy.
             pass
-    return client.get_or_create_collection(COLLECTION_NAME, metadata={"hnsw:space": DISTANCE_SPACE})
+    return client.get_or_create_collection(config.collection_name, metadata={"hnsw:space": DISTANCE_SPACE})
 
 
 def get_vector_store(config, *, reset: bool = False):

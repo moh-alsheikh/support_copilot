@@ -63,7 +63,7 @@ def main() -> None:
 
     with ask_tab:
         with st.form("ask_form"):
-            question = st.text_input("Question", value="How do I reset my password?")
+            question = st.text_input("Question", value="Which power supply is recommended for the Raspberry Pi 5?")
             submitted = st.form_submit_button("Ask", type="primary")
         if submitted and not question.strip():
             st.warning("Enter a question first.")

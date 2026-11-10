@@ -17,7 +17,10 @@ from llama_index.retrievers.bm25 import BM25Retriever
 from support_copilot.indexing.vector_store import get_collection, get_vector_store
 from support_copilot.ingestion.pipeline import build_nodes
 
-BM25_POLICY_VERSION = 1
+BM25_POLICY_VERSION = 2
+# bm25s's default pattern (\b\w\w+\b) drops one-character tokens, so digits that distinguish
+# otherwise-identical rows ("0 long, 7 short flashes", "Pi 5" vs "Pi 4") are never matched.
+BM25_TOKEN_PATTERN = r"(?u)\b\w+\b"
 MANIFEST_NAME = "index_manifest.json"
 
 
@@ -90,7 +93,9 @@ def ingest(config):
     bm25_path = config.storage_dir / "bm25"
     if bm25_path.exists():
         shutil.rmtree(bm25_path)
-    BM25Retriever.from_defaults(nodes=nodes, similarity_top_k=config.top_k).persist(str(bm25_path))
+    BM25Retriever.from_defaults(
+        nodes=nodes, similarity_top_k=config.top_k, token_pattern=BM25_TOKEN_PATTERN
+    ).persist(str(bm25_path))
     write_manifest(config, nodes)
     return index, documents, nodes
 
@@ -118,4 +123,7 @@ def load_bm25(config, *, top_k: int):
         raise RuntimeError("The BM25 index is missing. Run: python scripts/ingest_documents.py")
     retriever = BM25Retriever.from_persist_dir(str(path))
     retriever.similarity_top_k = min(top_k, manifest["node_count"])
+    # Not persisted by BM25Retriever: without this, queries fall back to the default pattern and
+    # stop matching the one-character tokens the index was built with.
+    retriever.token_pattern = BM25_TOKEN_PATTERN
     return retriever

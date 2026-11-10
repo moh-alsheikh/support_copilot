@@ -31,9 +31,9 @@ def main() -> None:
 
     if args.check_dependencies:
         print("Supported extensions:", ", ".join(sorted(SUPPORTED_EXTENSIONS)))
-        for dependency, available in check_ocr_dependencies().items():
-            print(f"{dependency}: {'available' if available else 'missing'}")
-        print("Missing OCR tools affect only images and scanned PDF pages. See OCR_SETUP.md.")
+        for dependency, status in check_ocr_dependencies().items():
+            print(f"{dependency}: {status}")
+        print("Missing or broken OCR tools affect only images and scanned PDF pages. See OCR_SETUP.md.")
         return
 
     config.raw_data_dir.mkdir(parents=True, exist_ok=True)

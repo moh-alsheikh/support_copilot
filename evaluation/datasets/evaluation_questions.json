@@ -1,47 +1,303 @@
 [
   {
     "question_id": "Q001",
-    "question": "How do I reset my password?",
-    "expected_answer": "Click \"Forgot password\" on the sign-in page and follow the email link; reset links expire after 24 hours.",
-    "expected_sources": ["support_faq.md"],
-    "expected_locations": ["lines:3-5"],
+    "question": "What does it mean when my Raspberry Pi LED shows 0 long flashes and 7 short flashes?",
+    "expected_answer": "Kernel image not found",
+    "expected_sources": [
+      "led-warning-flash-codes.md"
+    ],
+    "expected_locations": [
+      "lines:164-166"
+    ],
     "question_type": "supported",
-    "notes": "Update the location if the sample source changes."
+    "notes": "One row of an AsciiDoc table; tests exact lookup in a table split into line blocks."
   },
   {
     "question_id": "Q002",
-    "question": "How much storage does the Pro plan include?",
-    "expected_answer": "1 TB",
-    "expected_sources": ["lumen_user_guide.md"],
-    "expected_locations": ["lines:21-22"],
+    "question": "Which power supply is recommended for the Raspberry Pi 5?",
+    "expected_answer": "USB-C Power Supply",
+    "expected_sources": [
+      "power-supplies.md",
+      "27w-usb-c-power-supply-product-brief.pdf"
+    ],
+    "expected_locations": [
+      "lines:11-11",
+      "page:2"
+    ],
     "question_type": "supported",
-    "notes": "Checks grounded evidence from a line-addressable Markdown source."
+    "notes": "Stated in two sources (docs page and product brief); both pairs are valid."
   },
   {
     "question_id": "Q003",
-    "question": "What is the refund window for an annual plan?",
-    "expected_answer": "30 days from the original purchase date",
-    "expected_sources": ["support_policy.txt"],
-    "expected_locations": ["lines:3-4"],
+    "question": "How much current can the Raspberry Pi 5 provide to USB peripherals when it is powered by a 3A supply?",
+    "expected_answer": "600",
+    "expected_sources": [
+      "power-supplies.md",
+      "power-supplies.md",
+      "27w-usb-c-power-supply-product-brief.pdf"
+    ],
+    "expected_locations": [
+      "lines:114-114",
+      "lines:78-81",
+      "page:2"
+    ],
     "question_type": "supported",
-    "notes": "Checks grounded evidence from a second, distinct source file."
+    "notes": "600mA limit appears in a note, a table row, and the 27W brief (as the default limit)."
   },
   {
     "question_id": "Q004",
-    "question": "How long are files retained after I cancel my subscription?",
-    "expected_answer": "90 days",
-    "expected_sources": ["support_policy.txt"],
-    "expected_locations": ["lines:9-10"],
+    "question": "What is the maximum output of the Raspberry Pi 27W USB-C Power Supply at 5.1V?",
+    "expected_answer": "5A",
+    "expected_sources": [
+      "27w-usb-c-power-supply-product-brief.pdf",
+      "27w-usb-c-power-supply-product-brief.pdf"
+    ],
+    "expected_locations": [
+      "page:2",
+      "page:3"
+    ],
     "question_type": "supported",
-    "notes": "Second fact from the same source file at a different location."
+    "notes": "Overview and specification pages both state 5.1V, 5A."
   },
   {
     "question_id": "Q005",
-    "question": "Does Lumen Sync support two-factor authentication?",
+    "question": "What is the maximum fan speed of the Raspberry Pi Active Cooler?",
+    "expected_answer": "8000 RPM",
+    "expected_sources": [
+      "raspberry-pi-active-cooler-product-brief.pdf"
+    ],
+    "expected_locations": [
+      "page:3"
+    ],
+    "question_type": "supported",
+    "notes": "Specification page."
+  },
+  {
+    "question_id": "Q006",
+    "question": "What CPU does the Raspberry Pi 5 use?",
+    "expected_answer": "Cortex-A76",
+    "expected_sources": [
+      "raspberry-pi-5-product-brief.pdf",
+      "raspberry-pi-5-product-brief.pdf"
+    ],
+    "expected_locations": [
+      "page:3",
+      "page:2"
+    ],
+    "question_type": "supported",
+    "notes": "Specification page names BCM2712; overview page also names the Cortex-A76."
+  },
+  {
+    "question_id": "Q007",
+    "question": "What is the operating temperature range of the Raspberry Pi 5?",
+    "expected_answer": "70",
+    "expected_sources": [
+      "raspberry-pi-5-product-brief.pdf"
+    ],
+    "expected_locations": [
+      "page:3"
+    ],
+    "question_type": "supported",
+    "notes": "0°C to 70°C; expected_answer kept short because the degree symbol normalizes away."
+  },
+  {
+    "question_id": "Q008",
+    "question": "How much power does a Raspberry Pi 5 consume when it is turned off?",
+    "expected_answer": "1.4 W",
+    "expected_sources": [
+      "power-supplies.md"
+    ],
+    "expected_locations": [
+      "lines:150-150"
+    ],
+    "question_type": "supported",
+    "notes": "Around 1 W to 1.4 W by default; lines:157-157 has the reduced 0.01 W figure after an EEPROM change."
+  },
+  {
+    "question_id": "Q009",
+    "question": "Below what supply voltage does the Raspberry Pi low-voltage detection trigger?",
+    "expected_answer": "4.63",
+    "expected_sources": [
+      "power-supplies.md"
+    ],
+    "expected_locations": [
+      "lines:161-161"
+    ],
+    "question_type": "supported",
+    "notes": "4.63 V (±5%)."
+  },
+  {
+    "question_id": "Q010",
+    "question": "According to the safety and user guide, what minimum current must the Raspberry Pi 5 power supply provide?",
+    "expected_answer": "3A",
+    "expected_sources": [
+      "raspberry-pi-5-safety-and-user-guide.pdf"
+    ],
+    "expected_locations": [
+      "page:1"
+    ],
+    "question_type": "supported",
+    "notes": "English section is page 1; pages 2-3 repeat it in other languages, which retrieval may also surface."
+  },
+  {
+    "question_id": "Q011",
+    "question": "Do any Raspberry Pi models support USB-PPS?",
+    "expected_answer": "No",
+    "expected_sources": [
+      "power-supplies.md"
+    ],
+    "expected_locations": [
+      "lines:13-13"
+    ],
+    "question_type": "supported",
+    "notes": "Negative fact. The substring check is weak here ('no' matches many words); rely on the human rubric."
+  },
+  {
+    "question_id": "Q012",
+    "question": "Why were IKEA VARMFRONT power banks recalled?",
+    "expected_answer": "overheat",
+    "expected_sources": [
+      "cpsc-power-bank-recalls.json"
+    ],
+    "expected_locations": [
+      "$[17]"
+    ],
+    "question_type": "supported",
+    "notes": "CPSC recall 24344: the power banks can overheat, posing a fire hazard."
+  },
+  {
+    "question_id": "Q013",
+    "question": "In what situations can I request a refund?",
+    "expected_answer": "defect",
+    "expected_sources": [
+      "support-tickets-sample.csv",
+      "support-tickets-sample.csv",
+      "support-tickets-sample.csv",
+      "support-tickets-sample.csv",
+      "support-tickets-sample.csv"
+    ],
+    "expected_locations": [
+      "row:32",
+      "row:33",
+      "row:34",
+      "row:35",
+      "row:36"
+    ],
+    "question_type": "supported",
+    "notes": "All five check_refund_policy rows are valid evidence."
+  },
+  {
+    "question_id": "Q014",
+    "question": "What did the bootloader diagnostics screen report about the SD card?",
+    "expected_answer": "not detected",
+    "expected_sources": [
+      "bootloader-diagnostics.png"
+    ],
+    "expected_locations": [
+      "image:1"
+    ],
+    "question_type": "supported",
+    "notes": "OCR source. The screen is from a Compute Module 4, not a Raspberry Pi 5."
+  },
+  {
+    "question_id": "Q015",
+    "question": "Which GPIO pin carries the UART TXD signal on the 40-pin header?",
+    "expected_answer": "GPIO 14",
+    "expected_sources": [
+      "gpio-pinout-diagram.png"
+    ],
+    "expected_locations": [
+      "image:1"
+    ],
+    "question_type": "supported",
+    "notes": "OCR source. OCR keeps the 'GPIO 14 (TXD)' label but loses the physical pin numbers."
+  },
+  {
+    "question_id": "Q016",
+    "question": "What is the maximum output of the Raspberry Pi 45W USB-C Power Supply?",
     "expected_answer": "",
     "expected_sources": [],
     "expected_locations": [],
     "question_type": "unsupported",
-    "notes": "The sample corpus does not provide this value."
+    "notes": "Near-miss: only the 27W supply is in the knowledge base."
+  },
+  {
+    "question_id": "Q017",
+    "question": "How fast does the fan in the official Raspberry Pi 5 Case spin?",
+    "expected_answer": "",
+    "expected_sources": [],
+    "expected_locations": [],
+    "question_type": "unsupported",
+    "notes": "Near-miss: the Active Cooler fan speed is in the knowledge base; the Case fan is not."
+  },
+  {
+    "question_id": "Q018",
+    "question": "What is the list price of the Raspberry Pi 500+?",
+    "expected_answer": "",
+    "expected_sources": [],
+    "expected_locations": [],
+    "question_type": "unsupported",
+    "notes": "Near-miss: Raspberry Pi 5 prices are in the knowledge base; the 500+ is mentioned but never priced."
+  },
+  {
+    "question_id": "Q019",
+    "question": "According to the 1998 CPSC meeting on battery charger safety, what can happen when lead-acid batteries are overcharged?",
+    "expected_answer": "explode",
+    "expected_sources": [
+      "cpsc-battery-charger-safety-meeting-1998-scan.pdf"
+    ],
+    "expected_locations": [
+      "page:2"
+    ],
+    "question_type": "supported",
+    "notes": "Scanned PDF (OCR). Overcharging may cause them to vent, catch fire, or explode."
+  },
+  {
+    "question_id": "Q020",
+    "question": "What does hissing or bubbling during charging indicate in a sealed lead-acid battery?",
+    "expected_answer": "heat",
+    "expected_sources": [
+      "cpsc-battery-charger-safety-meeting-1998-scan.pdf"
+    ],
+    "expected_locations": [
+      "page:2"
+    ],
+    "question_type": "supported",
+    "notes": "Scanned PDF (OCR). Hissing or bubbling indicates heat is being generated in the battery."
+  },
+  {
+    "question_id": "Q021",
+    "question": "What are the four parts of a battery described in the CPSC battery charger safety meeting?",
+    "expected_answer": "separator",
+    "expected_sources": [
+      "cpsc-battery-charger-safety-meeting-1998-scan.pdf"
+    ],
+    "expected_locations": [
+      "page:1"
+    ],
+    "question_type": "supported",
+    "notes": "Scanned PDF (OCR). Anode, cathode, electrolyte, and separator."
+  },
+  {
+    "question_id": "Q022",
+    "question": "What kind of charger did Neil Chernoff propose to fix lead-acid battery charging problems?",
+    "expected_answer": "smart charger",
+    "expected_sources": [
+      "cpsc-battery-charger-safety-meeting-1998-scan.pdf"
+    ],
+    "expected_locations": [
+      "page:2"
+    ],
+    "question_type": "supported",
+    "notes": "Scanned PDF (OCR). A smart (pulse type fast) charger that detects full charge and shuts off."
+  },
+  {
+    "question_id": "Q023",
+    "question": "What civil penalty amounts did the CPSC set for unsafe battery chargers?",
+    "expected_answer": "",
+    "expected_sources": [],
+    "expected_locations": [],
+    "question_type": "unsupported",
+    "notes": "Near-miss: page 3 of the scan (a misfiled fabric-flammability meeting) mentions civil penalties, but no amounts and nothing about chargers."
   }
 ]

@@ -12,9 +12,17 @@ evaluation/reports/*.csv
 evaluation/reports/*.md
 data/raw/**
 # Curated sample corpus ships with the repo; anything else you drop under data/raw/ stays ignored.
-!data/raw/lumen_user_guide.md
-!data/raw/support_faq.md
-!data/raw/support_policy.txt
+!data/raw/raspberry-pi-5-product-brief.pdf
+!data/raw/27w-usb-c-power-supply-product-brief.pdf
+!data/raw/raspberry-pi-active-cooler-product-brief.pdf
+!data/raw/raspberry-pi-5-safety-and-user-guide.pdf
+!data/raw/led-warning-flash-codes.md
+!data/raw/power-supplies.md
+!data/raw/bootloader-diagnostics.png
+!data/raw/gpio-pinout-diagram.png
+!data/raw/cpsc-power-bank-recalls.json
+!data/raw/support-tickets-sample.csv
+!data/raw/cpsc-battery-charger-safety-meeting-1998-scan.pdf
 data/processed/*.jsonl
 data/metadata/*.csv
 evaluation/reports/**/*.csv

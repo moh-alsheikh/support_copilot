@@ -50,23 +50,42 @@ a supported format first.
 
 ### The sample knowledge base
 
-`data/raw/` ships with a small, genuinely support-flavored sample knowledge base for a fictional product
-("Lumen Sync," a desktop backup/sync client), so the pipeline is runnable and testable out of the
-box: `lumen_user_guide.md` (product manual), `support_faq.md` (FAQ), and `support_policy.txt`
-(refund/SLA policy). It is intentionally small — enough to exercise multi-file discovery, distinct
-`lines:A-B` citations across three separate sources, and the full grounded-answer/abstention
-contract, not to demonstrate scale. Swap in your own product manuals, support policies, or KB
-articles under `data/raw/` for a real deployment; the pipeline treats every source the same way
-regardless of size or domain. Expected behavior when preparing it:
+`data/raw/` ships 11 files centred on one product, the **Raspberry Pi 5**, plus related support
+and safety data, so the pipeline is runnable and testable out of the box and every supported format
+is exercised:
 
-- 3 files, a low double-digit number of line-addressable records, no duplicates;
-- OCR never triggers — nothing here is a scanned image or a text-less PDF;
-- `evaluation/datasets/evaluation_questions.json` has matching `(source, location)` ground truth
-  for this knowledge base; update it if you replace or edit the sample files.
+| Format | Files |
+| --- | --- |
+| PDF (text layer) | Pi 5 product brief, 27W USB-C power supply brief, Active Cooler brief, Pi 5 safety and user guide |
+| PDF (scanned, OCR only) | `cpsc-battery-charger-safety-meeting-1998-scan.pdf` — 3 image-only pages |
+| Markdown (AsciiDoc tables) | `led-warning-flash-codes.md`, `power-supplies.md` |
+| Images (OCR) | `bootloader-diagnostics.png`, `gpio-pinout-diagram.png` |
+| JSON | `cpsc-power-bank-recalls.json` — 32 US CPSC power-bank recalls |
+| CSV | `support-tickets-sample.csv` — 135 rows of generic customer-support Q&A |
+
+Sources and licenses for every file are in [`data/SOURCES.md`](data/SOURCES.md). Several
+questions need more than one file (for example, LED codes plus power-supply requirements). Swap
+in your own product manuals, support policies, or KB articles under `data/raw/`; the pipeline
+treats every source the same way. Expected behavior when preparing it:
+
+- 11 files, about 320 normalized records; OCR runs on the two images and the scanned PDF (needs
+  Tesseract and Poppler — see [`OCR_SETUP.md`](OCR_SETUP.md); without them those files are
+  skipped with a warning);
+- table rows in the Markdown files become one labelled record each (`Long flashes: 0 | Short
+  flashes: 7 | Status: …`), keeping their original `lines:A-B` location;
+- `evaluation/datasets/evaluation_questions.json` has 23 questions (19 answerable, 4 deliberately
+  unanswerable near-misses) with `(source, location)` ground truth verified against these files;
+  update it if you replace or edit them.
 
 ## Complete workflow
 
+Requires Python 3.11 or 3.12 (3.12 is what's used day to day) and [Ollama](https://ollama.com) with
+`llama3.2:3b` and `nomic-embed-text` pulled. Python 3.13+ doesn't work on Intel Macs: `chromadb`
+depends on `onnxruntime`, which publishes no Intel-Mac builds for those versions.
+
 ```bash
+python3.12 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
 cp .env.example .env
 
 # 1. Inspect optional OCR dependencies.
@@ -80,16 +99,64 @@ python scripts/ingest_documents.py
 # Repeated automated build after reviewing generated state:
 python scripts/ingest_documents.py --force
 
-# 4. Inspect ranking without generation.
+# 4. Inspect ranking without generation. Without --question, the default is
+#    "Which power supply is recommended for the Raspberry Pi 5?".
 python scripts/inspect_index.py --mode semantic
 python scripts/inspect_index.py --mode bm25
 python scripts/inspect_index.py --mode hybrid
 
-# 5. Measure retrieval before evaluating answers.
+# Ask your own question. Each example below is answered by a different file type:
+python scripts/inspect_index.py --mode hybrid --question "What is the maximum fan speed of the Raspberry Pi Active Cooler?"              # PDF
+python scripts/inspect_index.py --mode hybrid --question "Below what supply voltage does the Raspberry Pi low-voltage detection trigger?"   # Markdown
+python scripts/inspect_index.py --mode hybrid --question "Why were IKEA VARMFRONT power banks recalled?"                                    # JSON
+python scripts/inspect_index.py --mode hybrid --question "In what situations can I request a refund?"                                      # CSV
+python scripts/inspect_index.py --mode hybrid --question "What did the bootloader diagnostics screen report about the SD card?"            # image (OCR)
+python scripts/inspect_index.py --mode hybrid --question "Which GPIO pin carries the UART TXD signal on the 40-pin header?"                # image (OCR)
+python scripts/inspect_index.py --mode hybrid --question "What are the four parts of a battery described in the CPSC battery charger safety meeting?"   # scanned PDF (OCR)
+
+# The pinout diagram is the hardest OCR source: the two pin columns come out interleaved, so labels
+# like "GPIO 14 (TXD)" survive but pin positions don't. It ranks 3rd, behind two GPIO-related text
+# chunks; see OCR_SETUP.md, "OCR Quality".
+
+# Not answerable from the knowledge base: retrieval still returns the closest chunks (here, the
+# 27W supply). Only the answer step refuses, which is what the near-miss evaluation questions test.
+python scripts/inspect_index.py --mode hybrid --question "What is the maximum output of the Raspberry Pi 45W USB-C Power Supply?"
+
+# Widen the result list (default comes from TOP_K in .env). Here the answer (product brief,
+# page 3) ranks 6th, so it only shows up beyond the default top 4:
+python scripts/inspect_index.py --mode hybrid --top-k 8 --question "What is the operating temperature range of the Raspberry Pi 5?"
+
+# 5. Ask with full generation: retrieval + a grounded, cited answer from the LLM.
+#    On a CPU-only machine expect about a minute per answer (longer for the first, while the model loads).
+python scripts/ask.py --question "Which power supply is recommended for the Raspberry Pi 5?"
+python scripts/ask.py --question "What is the maximum fan speed of the Raspberry Pi Active Cooler?"
+python scripts/ask.py --question "Below what supply voltage does the Raspberry Pi low-voltage detection trigger?"
+python scripts/ask.py --question "Why were IKEA VARMFRONT power banks recalled?"
+python scripts/ask.py --question "In what situations can I request a refund?"
+
+# Near-miss questions: the knowledge base covers a similar product, not this one. The answer
+# should be the exact refusal, even though related chunks are retrieved.
+python scripts/ask.py --question "How fast does the fan in the official Raspberry Pi 5 Case spin?"
+python scripts/ask.py --question "What is the maximum output of the Raspberry Pi 45W USB-C Power Supply?"
+
+# Scanned PDF: every page of this 1998 CPSC meeting log is OCR'd (needs Tesseract + Poppler, see
+# OCR_SETUP.md). The second question is a near-miss: page 3 mentions civil penalties, but for a
+# different meeting about fabrics, so the answer should be the refusal.
+python scripts/ask.py --question "According to the 1998 CPSC meeting on battery charger safety, what can happen when lead-acid batteries are overcharged?"
+python scripts/ask.py --question "What civil penalty amounts did the CPSC set for unsafe battery chargers?"
+
+# A known small-model limitation: the answer ("no models support USB-PPS") is retrieved, but
+# llama3.2:3b usually refuses anyway. See docs/learning/local-llm-model-selection.md.
+python scripts/ask.py --question "Do any Raspberry Pi models support USB-PPS?"
+
+# Try a different Ollama model for one run without editing .env (after `ollama pull phi4-mini`):
+OLLAMA_LLM_MODEL=phi4-mini python scripts/ask.py --question "Do any Raspberry Pi models support USB-PPS?"
+
+# 6. Measure retrieval before evaluating answers.
 python scripts/run_evaluation.py retrieval --mode hybrid --top-k 4 --run-name baseline
 python scripts/run_evaluation.py answers --mode hybrid --top-k 4 --run-name baseline
 
-# 6. Open the workbench.
+# 7. Open the workbench.
 streamlit run app.py
 ```
 

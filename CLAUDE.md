@@ -33,15 +33,17 @@ opt-in comparison provider (`LLM_PROVIDER=anthropic` + `ANTHROPIC_API_KEY` in `.
 ## Commands
 
 ```bash
-# Setup
-cp .env.example .env
+# Setup (Python 3.12; 3.13+ fails on Intel Macs — no onnxruntime builds for chromadb)
+python3.12 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+cp .env.example .env
 
 # Pipeline, in order (each stage is a separate command deliberately: "ingest once, query many times")
 python prepare_corpus.py --check-dependencies   # check optional OCR deps
 python prepare_corpus.py                        # extract data/raw/* -> data/processed/document_records.jsonl
 python scripts/ingest_documents.py               # rebuild Chroma + BM25 (needs Ollama running); --force skips the overwrite confirmation
 python scripts/inspect_index.py --mode semantic|bm25|hybrid   # inspect ranking without generation
+python scripts/ask.py --question "..."           # one question end to end: answer + cited sources (needs Ollama)
 python scripts/run_evaluation.py retrieval --mode hybrid --top-k 4 --run-name <name>
 python scripts/run_evaluation.py answers   --mode hybrid --top-k 4 --run-name <name>
 streamlit run app.py
@@ -92,8 +94,9 @@ Key mechanics worth knowing before touching retrieval or generation code:
   not an arbitrary choice (F1 in `docs/known-findings.md`) — don't shrink it to "optimize" without
   reading that finding first. Separately, `load_bm25()` in `indexing/index_manager.py` clamps
   `similarity_top_k` to the manifest's `node_count`, because the `bm25s` backend hard-errors when
-  asked for more results than the corpus contains — this matters on the shipped ~24-node sample
-  corpus (smaller than the 50-candidate floor) and becomes a no-op once a corpus exceeds that floor.
+  asked for more results than the corpus contains — this matters for any corpus smaller than the
+  50-candidate floor (the original Lumen sample was 24 nodes) and is a no-op above it (the current
+  sample is ~436 nodes).
 - **Hybrid = semantic (Chroma) + BM25, fused with hand-rolled RRF, then reranked.**
   `reciprocal_rank_fusion` in `retriever.py` preserves each branch's original rank in node metadata
   (`semantic_rank`, `bm25_rank`) for UI/debugging — it clones nodes before mutating metadata so
@@ -122,14 +125,25 @@ Key mechanics worth knowing before touching retrieval or generation code:
 
 ## The sample corpus
 
-`data/raw/` ships 3 small, support-flavored files for a fictional product ("Lumen Sync"):
-`lumen_user_guide.md`, `support_faq.md`, `support_policy.txt` — sized to exercise the pipeline
-(multi-file discovery, line-addressable citations across distinct sources), not to demonstrate
-scale. `evaluation/datasets/evaluation_questions.json` has `(source, location)` ground truth
-verified against these exact files' actual block boundaries (`ingestion/loaders/text_loader.py`
-splits text on blank lines) — if you edit or replace any of them, re-verify the matching evaluation
-cases rather than guessing new line ranges. These 3 files are explicitly un-ignored in `.gitignore`
-so they ship with the repo; anything else dropped into `data/raw/` stays gitignored by default.
+`data/raw/` ships 11 files centred on the Raspberry Pi 5 — four text-layer PDFs, one genuinely
+scanned PDF (OCR only), two AsciiDoc pages saved as `.md`, two PNGs (OCR), a CPSC power-bank
+recalls JSON, and a 135-row support-ticket CSV. Sources and licenses are in `data/SOURCES.md`
+(kept outside `data/raw/` so it isn't ingested). Each file is explicitly un-ignored in
+`.gitignore`; anything else dropped into `data/raw/` stays gitignored.
+
+`evaluation/datasets/evaluation_questions.json` has 23 questions (19 supported, 4 unsupported
+near-misses) with `(source, location)` ground truth verified against the prepared records. Text
+files split on blank lines, **except** header-row tables (AsciiDoc `|===` and Markdown pipe
+tables), which `ingestion/loaders/text_loader.py` turns into one labelled record per row
+(`Heading — Column: value | …`) while keeping the row's original `lines:A-B` location. If you edit
+or replace a source file, re-verify the matching evaluation cases against
+`data/processed/document_records.jsonl` rather than guessing line ranges.
+
+OCR needs Tesseract and Poppler on `PATH`; on this macOS 12 machine Poppler comes from MacPorts
+(`/opt/local/bin`, appended last on `PATH`) — see `OCR_SETUP.md`. BM25 indexes with
+`BM25_TOKEN_PATTERN` (keeps one-character tokens such as digits), guarded by
+`BM25_POLICY_VERSION = 2`; `load_bm25()` re-applies the pattern because `BM25Retriever` doesn't
+persist it.
 
 ## When debugging, follow the failure boundaries in pipeline order
 

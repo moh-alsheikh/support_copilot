@@ -1,7 +1,7 @@
 """Inspect ranked evidence without calling an LLM.
 
 Usage:
-    python scripts/inspect_index.py --mode hybrid --question "How do I reset my password?"
+    python scripts/inspect_index.py --mode hybrid --question "Which power supply is recommended for the Raspberry Pi 5?"
 """
 
 import argparse
@@ -21,7 +21,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", choices=["semantic", "bm25", "hybrid"], default="hybrid")
     parser.add_argument("--top-k", type=int)
-    parser.add_argument("--question", default="How do I reset my password?")
+    parser.add_argument("--question", default="Which power supply is recommended for the Raspberry Pi 5?")
     args = parser.parse_args()
     config = AppConfig.from_env()
     configure_llamaindex(config)

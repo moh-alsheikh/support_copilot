@@ -5,9 +5,14 @@ PDF OCR additionally uses Poppler through `pdf2image`. Text, Word, CSV, and JSON
 working when these optional system tools are absent.
 """
 
+from functools import lru_cache
 from pathlib import Path
 import shutil
-from typing import Any
+import subprocess
+
+AVAILABLE = "available"
+MISSING = "missing"
+BROKEN = "broken"
 
 
 class OCRDependencyError(RuntimeError):
@@ -20,39 +25,62 @@ def clean_ocr_text(text: str) -> str:
     return "\n".join(" ".join(line.split()) for line in text.splitlines() if line.strip())
 
 
-def check_ocr_dependencies() -> dict[str, Any]:
-    """Return an easy-to-display status report for OCR Python and system dependencies."""
-
+def _python_package_status(module: str) -> str:
     try:
-        import pytesseract  # noqa: F401
-
-        pytesseract_available = True
+        __import__(module)
+        return AVAILABLE
     except ImportError:
-        pytesseract_available = False
+        return MISSING
 
-    try:
-        import pdf2image  # noqa: F401
 
-        pdf2image_available = True
-    except ImportError:
-        pdf2image_available = False
+@lru_cache(maxsize=None)
+def _program_status(*commands: tuple[str, ...]) -> str:
+    """Return available/missing/broken for the first of `commands` that is on PATH and runs.
+
+    Being on PATH is not enough: a binary whose shared libraries were removed by a package
+    upgrade is found by `shutil.which` but aborts on launch, so each candidate is actually run.
+    """
+
+    found = [command for command in commands if shutil.which(command[0])]
+    if not found:
+        return MISSING
+    for command in found:
+        try:
+            if subprocess.run(command, capture_output=True, timeout=10).returncode == 0:
+                return AVAILABLE
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+    return BROKEN
+
+
+def check_ocr_dependencies() -> dict[str, str]:
+    """Return `available`, `missing`, or `broken` for each OCR Python and system dependency."""
 
     return {
-        "pytesseract_python": pytesseract_available,
-        "tesseract_program": shutil.which("tesseract") is not None,
-        "pdf2image_python": pdf2image_available,
-        "poppler_program": bool(shutil.which("pdftoppm") or shutil.which("pdftocairo")),
+        "pytesseract_python": _python_package_status("pytesseract"),
+        "tesseract_program": _program_status(("tesseract", "--version")),
+        "pdf2image_python": _python_package_status("pdf2image"),
+        "poppler_program": _program_status(("pdftoppm", "-v"), ("pdftocairo", "-v")),
     }
+
+
+def _require_program(status: str, name: str) -> None:
+    if status == MISSING:
+        raise OCRDependencyError(f"Install the {name} program. See OCR_SETUP.md.")
+    if status == BROKEN:
+        raise OCRDependencyError(
+            f"{name} is installed but fails to run (often a broken shared library after a package "
+            "upgrade). Reinstall it. See OCR_SETUP.md."
+        )
 
 
 def _require_image_ocr() -> None:
     """Raise a beginner-readable error when image OCR dependencies are incomplete."""
 
     status = check_ocr_dependencies()
-    if not status["pytesseract_python"]:
+    if status["pytesseract_python"] != AVAILABLE:
         raise OCRDependencyError("Install pytesseract with: pip install -r requirements.txt")
-    if not status["tesseract_program"]:
-        raise OCRDependencyError("Install the Tesseract program. See OCR_SETUP.md.")
+    _require_program(status["tesseract_program"], "Tesseract")
 
 
 def ocr_image(image_path: str | Path, language: str = "eng") -> str:
@@ -71,10 +99,9 @@ def ocr_pdf_page(pdf_path: str | Path, page_number: int, dpi: int = 300, languag
 
     _require_image_ocr()
     status = check_ocr_dependencies()
-    if not status["pdf2image_python"]:
+    if status["pdf2image_python"] != AVAILABLE:
         raise OCRDependencyError("Install pdf2image with: pip install -r requirements.txt")
-    if not status["poppler_program"]:
-        raise OCRDependencyError("Install Poppler so scanned PDF pages can be rendered. See OCR_SETUP.md.")
+    _require_program(status["poppler_program"], "Poppler")
 
     from pdf2image import convert_from_path
     import pytesseract

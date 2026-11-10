@@ -1,4 +1,4 @@
-## Tested with Python 3.11 and 3.12.
+## Tested with Python 3.11 and 3.12 (3.13+ unsupported on Intel Macs: no onnxruntime builds).
 llama-index==0.14.23
 llama-index-core==0.14.23
 llama-index-llms-ollama==0.10.1
