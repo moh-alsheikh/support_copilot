@@ -11,15 +11,15 @@ item by item against the code rather than the docs.
 
 ## Summary
 
-**Overall: 15.5 of 88 points — about 18%.** (Re-scored 2026-11-10 after incremental indexing.)
+**Overall: 16.5 of 88 points — about 19%.** (Re-scored 2026-11-10 after incremental indexing and the cross-encoder reranker.)
 
 | # | Section | Items | Points | Coverage |
 |---|---|---:|---:|---:|
 | 1 | Document Ingestion & Chunking | 10 | 2.5 | 25% |
 | 2 | Embedding & Representation | 9 | 2.5 | 28% |
-| 3 | Indexing & Storage Architecture | 6 | 2.5 | 42% |
+| 3 | Indexing & Storage Architecture | 6 | 3 | 50% |
 | 4 | Query Understanding & Transformation | 7 | 0 | 0% |
-| 5 | Retrieval Strategies | 10 | 1.5 | 15% |
+| 5 | Retrieval Strategies | 10 | 2 | 20% |
 | 6 | Agentic RAG | 7 | 0 | 0% |
 | 7 | Graph RAG & Structured RAG | 7 | 0 | 0% |
 | 8 | Context Handling & Generation | 8 | 2.5 | 31% |
@@ -27,12 +27,12 @@ item by item against the code rather than the docs.
 | 10 | Training & Fine-Tuning for RAG | 5 | 0 | 0% |
 | 11 | Evaluation & Observability | 6 | 2.5 | 42% |
 | 12 | Production & Enterprise | 8 | 0.5 | 6% |
-| | **Total** | **88** | **15.5** | **18%** |
+| | **Total** | **88** | **16.5** | **19%** |
 
-### How to read the 18%
+### How to read the 19%
 
 The catalog is a menu, not a checklist. Many items are alternatives to each other: no system uses
-every chunking strategy or every agent pattern. So 18% measures breadth, not quality.
+every chunking strategy or every agent pattern. So 19% measures breadth, not quality.
 
 What matters is where the coverage sits. The only sections above 30% are the ones this project
 exists to demonstrate:
@@ -82,7 +82,7 @@ project is a verifiable-grounding prototype, not a survey of techniques.
 |---|:---:|---|
 | Vector index types | ✅ | HNSW via Chroma, with `hnsw:space="cosine"` set explicitly in `indexing/vector_store.py` |
 | Hybrid search (BM25 + vector, RRF) | ✅ | Hand-rolled RRF (`rank_constant=60`) in `retrieval/retriever.py`. Candidate pool of `max(50, top_k * 5)` per branch; each branch's rank is kept in node metadata for debugging |
-| Re-ranking pipeline | 🟡 | 50+ candidates are fused, but `retrieval/reranker.py` only adds +0.001 per query term (longer than 2 characters) found in the chunk. It's a lexical tiebreaker, not a cross-encoder |
+| Re-ranking pipeline | ✅ | Retrieve wide, rerank narrow: ~50 fused candidates are scored by a local MS MARCO cross-encoder (`Xenova/ms-marco-MiniLM-L-6-v2` via `fastembed`) in `retrieval/reranker.py`, then cut to top-k. Hybrid MRR 0.807 → 0.947, recall 0.856 → 0.916 |
 | Hierarchical index (RAPTOR) | ❌ | — |
 | Graph index | ❌ | — |
 | Multi-index routing | ❌ | — |
@@ -97,7 +97,7 @@ or intent routing. The user's question is embedded and searched exactly as typed
 | Technique | Status | Evidence |
 |---|:---:|---|
 | Naive RAG | ✅ | `--mode semantic`: single-shot vector search |
-| Advanced RAG | 🟡 | `--mode hybrid`: hybrid search plus re-ranking, but with the lexical reranker from §3 |
+| Advanced RAG | ✅ | `--mode hybrid`: hybrid search plus cross-encoder re-ranking (§3) |
 | Modular RAG | ❌ | Retrieval mode is a string branch inside `retrieve()`, not composable components (also noted in `ARCHITECTURE_ASSESSMENT.md`) |
 | Adaptive RAG | ❌ | Retrieval always runs |
 | Self-RAG | ❌ | — |
@@ -182,8 +182,7 @@ These strengthen what the project already claims to do, rather than adding bread
    `text_instruction="search_document:"` to `OllamaEmbedding` in `configure_llamaindex()`. It's a
    small code change, but existing vectors were embedded without the prefix, so it needs an
    `ingest_documents.py --force` rebuild. Fixes the §2 asymmetric-embedding gap.
-2. **Replace the lexical reranker with a cross-encoder.** The 50-candidate pool is already there to
-   rerank. This turns §3 re-ranking and §5 Advanced RAG into full implementations.
+2. ~~Replace the lexical reranker with a cross-encoder.~~ Done 2026-11-10 (§3, §5).
 3. **Add nDCG to `evaluation/evaluators.py`.** It completes the §11 retrieval metrics set.
 
 ## Related

@@ -39,6 +39,7 @@ class AppConfig:
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-5-5"
     collection_name: str = "technical_evidence"
+    reranker_model: str = "Xenova/ms-marco-MiniLM-L-6-v2"
     request_timeout: float = 360.0
     top_k: int = 4
     chunk_size: int = 512
@@ -69,6 +70,7 @@ class AppConfig:
             anthropic_api_key=os.getenv("ANTHROPIC_API_KEY", ""),
             anthropic_model=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5"),
             collection_name=os.getenv("COLLECTION_NAME", "technical_evidence"),
+            reranker_model=os.getenv("RERANKER_MODEL", "Xenova/ms-marco-MiniLM-L-6-v2").strip(),
             request_timeout=float(os.getenv("OLLAMA_REQUEST_TIMEOUT", "360")),
             top_k=int(os.getenv("TOP_K", "4")),
             chunk_size=int(os.getenv("CHUNK_SIZE", "512")),

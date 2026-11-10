@@ -25,7 +25,7 @@ from llama_index.core.storage.docstore import SimpleDocumentStore
 from llama_index.retrievers.bm25 import BM25Retriever
 
 from support_copilot.indexing.vector_store import DISTANCE_SPACE, get_collection, get_vector_store
-from support_copilot.ingestion.document_adapter import load_documents
+from support_copilot.ingestion.document_adapter import EMBEDDED_METADATA_KEYS, load_documents
 from support_copilot.ingestion.parsers import build_parser
 
 BM25_POLICY_VERSION = 2
@@ -63,6 +63,7 @@ def vector_policy(config) -> dict:
         "embedding_model": config.embedding_model,
         "distance_space": DISTANCE_SPACE,
         "chunk_id_scheme": CHUNK_ID_SCHEME,
+        "embedded_metadata_keys": list(EMBEDDED_METADATA_KEYS),
     }
 
 

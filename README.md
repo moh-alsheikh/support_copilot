@@ -13,7 +13,7 @@ Raw multi-format files
   -> extraction/OCR -> normalized records with source + location
   -> LlamaIndex Documents -> Nodes
   -> Chroma semantic index + persisted BM25 index
-  -> semantic/BM25/hybrid retrieval -> RRF -> transparent rerank
+  -> semantic/BM25/hybrid retrieval -> RRF -> cross-encoder rerank
   -> numbered evidence -> QA/refine contracts -> normalized answer -> universal citations
   -> retrieval reports + answer reports + human rubric
 ```

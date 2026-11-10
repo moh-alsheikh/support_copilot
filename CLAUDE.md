@@ -100,10 +100,18 @@ Key mechanics worth knowing before touching retrieval or generation code:
   asked for more results than the corpus contains — this matters for any corpus smaller than the
   50-candidate floor (the original Lumen sample was 24 nodes) and is a no-op above it (the current
   sample is ~436 nodes).
-- **Hybrid = semantic (Chroma) + BM25, fused with hand-rolled RRF, then reranked.**
+- **Hybrid = semantic (Chroma) + BM25, fused with hand-rolled RRF, then cross-encoder reranked.**
   `reciprocal_rank_fusion` in `retriever.py` preserves each branch's original rank in node metadata
   (`semantic_rank`, `bm25_rank`) for UI/debugging — it clones nodes before mutating metadata so
-  persisted source metadata is never touched.
+  persisted source metadata is never touched. `retrieval/reranker.py` then scores all ~50 fused
+  candidates with a local cross-encoder (`fastembed`, ONNX — no PyTorch; model from
+  `RERANKER_MODEL`, cached in `storage/models/`, empty value = keep fusion order) and stores the
+  fusion score as `rrf_score`. Hybrid scores are therefore cross-encoder logits, not RRF sums.
+  `rerank()` takes an injectable scorer so tests never download a model.
+- **Only `title` (and `topic`) metadata is embedded or BM25-indexed.** `EMBEDDED_METADATA_KEYS` in
+  `ingestion/document_adapter.py`; all other metadata (hashes, IDs, location, encoding) stays on the
+  node for citations and evaluation. It's part of `vector_policy()`, so changing it forces a full
+  rebuild.
 - **Grounding contract is enforced in code, not just prompted.** `synthesizer.py`: no evidence ->
   return `ABSTENTION_MESSAGE` without calling the provider; `normalize_answer()` collapses any
   answer that *starts* with the abstention message back to the exact message, even if the model

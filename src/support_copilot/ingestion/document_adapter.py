@@ -10,6 +10,13 @@ from llama_index.core import Document
 
 from .processed_records import load_records
 
+# Only these metadata fields join the text that is embedded and BM25-indexed (both use LlamaIndex's
+# EMBED view). Everything else — hashes, IDs, encoding, location — stays in metadata for citations
+# and evaluation but would otherwise dominate short chunks (a one-line table row carried nine
+# metadata lines, including a 64-character content hash) and turn digits like line numbers into
+# BM25 matches.
+EMBEDDED_METADATA_KEYS = ("title", "topic")
+
 
 def stable_record_id(record: dict) -> str:
     """Derive a repeatable ID from the document ID, source, location, and text."""
@@ -37,5 +44,14 @@ def load_documents(config):
     for record in load_records(config.processed_records_path):
         metadata = dict(record["metadata"])
         metadata.setdefault("doc_id", record.get("doc_id", ""))
-        documents.append(Document(id_=stable_record_id(record), text=record["text"], metadata=metadata))
+        hidden = [key for key in metadata if key not in EMBEDDED_METADATA_KEYS]
+        documents.append(
+            Document(
+                id_=stable_record_id(record),
+                text=record["text"],
+                metadata=metadata,
+                excluded_embed_metadata_keys=hidden,
+                excluded_llm_metadata_keys=hidden,
+            )
+        )
     return documents

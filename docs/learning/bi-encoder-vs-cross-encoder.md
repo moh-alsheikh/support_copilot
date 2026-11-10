@@ -2,7 +2,7 @@
 
 How this project finds evidence today (a bi-encoder), what a cross-encoder reranker would add, and
 why it targets the exact retrieval failures measured on the Raspberry Pi knowledge base. Written
-2026-10-05. The cross-encoder is **not implemented**; everything about it here is a proposal.
+2026-10-05, updated 2026-11-10: the cross-encoder is **implemented** — see *What was built* below.
 
 ## Two ways to score "is this passage relevant to this question?"
 
@@ -139,9 +139,38 @@ What it does **not** fix:
 - **The automated answer checks' blind spot.** Citations attached to wrong claims still pass
   `answer_checks()`.
 
-## Implementation options and costs
+## What was built (2026-11-10)
 
-**Recommended route: LlamaIndex's built-in reranker.** `SentenceTransformerRerank` ships in the
+`retrieval/reranker.py` scores every fused hybrid candidate (~50) with
+`Xenova/ms-marco-MiniLM-L-6-v2` through **`fastembed`**, which runs on ONNX Runtime — already
+installed for Chroma — so no PyTorch was needed. The model (80 MB, Apache-2.0) downloads once to
+`storage/models/`; `RERANKER_MODEL` in `.env` selects it, and an empty value keeps fusion order.
+Each candidate is scored on its embed view (title plus text, no hashes or IDs). The fusion score is
+kept as `rrf_score` next to `semantic_rank` and `bm25_rank`. `rerank()` takes an injectable scorer
+so tests run offline.
+
+The `SentenceTransformerRerank` route below was not taken: the last PyTorch with an Intel-Mac
+build (2.2.2) was built against NumPy 1.x, while this environment has NumPy 2.5; Ollama has no
+rerank endpoint (404).
+
+Measured (hybrid, top 4, 23 questions, together with title-only embedded metadata):
+
+| | Hit@4 | Recall@4 | Precision | MRR |
+|---|---|---|---|---|
+| Before (word-bonus rerank, all metadata embedded) | 0.895 | 0.856 | 0.382 | 0.807 |
+| After | **0.947** | **0.916** | **0.395** | **0.947** |
+
+- **Q007** went from a miss to rank 1; Q015, Q019, Q022 moved to rank 1; no question got worse.
+- **Q001 still misses:** the correct row rose from rank 12 to 7, but the MiniLM model doesn't
+  reliably match "0 long and 7 short" to `Long flashes: 0 | Short flashes: 7` — small cross-encoders
+  are weak at exact digit matching. A larger model (e.g. `bge-reranker-base`, 1 GB) is the next
+  thing to try.
+- **Latency:** the cross-encoder itself takes ~1.9 s for 50 candidates on this CPU (0.3 s for 20),
+  plus a one-time model load. Small next to the ~50 s LLM answer.
+
+## Implementation options considered
+
+**First-choice route (not taken, see above): LlamaIndex's built-in reranker.** `SentenceTransformerRerank` ships in the
 installed `llama-index-core` (`llama_index/core/postprocessor/sbert_rerank.py`). Three things to
 know about it:
 

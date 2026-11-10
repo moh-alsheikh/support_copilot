@@ -3,7 +3,7 @@
 from llama_index.core.schema import NodeWithScore
 
 from support_copilot.indexing.index_manager import load_bm25, load_index
-from support_copilot.retrieval.reranker import rerank
+from support_copilot.retrieval.reranker import cross_encoder_scorer, rerank
 
 DEFAULT_CANDIDATE_K = 50
 
@@ -58,4 +58,11 @@ def retrieve(config, question: str, top_k: int | None = None, *, mode: str = "hy
         return bm25_results[:final_k]
     if mode != "hybrid":
         raise ValueError("mode must be semantic, bm25, or hybrid")
-    return rerank(reciprocal_rank_fusion([vector_results, bm25_results], candidate_k), question)[:final_k]
+    fused = reciprocal_rank_fusion([vector_results, bm25_results], candidate_k)
+    # An empty RERANKER_MODEL keeps fusion order, e.g. on a machine that can't download the model.
+    scorer = (
+        cross_encoder_scorer(config.reranker_model, config.storage_dir / "models")
+        if config.reranker_model
+        else None
+    )
+    return rerank(fused, question, scorer)[:final_k]

@@ -199,6 +199,6 @@ Summary, with detail sections above for semantic and bm25:
 |---|---|---|---|
 | **semantic** | `exp(-distance)`, distance = Chroma cosine distance | `[0.135, 1.0]` | no — pass-through |
 | **bm25** | raw `bm25s` Okapi BM25 weight | unbounded, corpus-dependent | no — pass-through |
-| **hybrid** | Reciprocal Rank Fusion sum, `retrieval/retriever.py`'s `reciprocal_rank_fusion()`: `Σ 1 / (60 + rank)` per branch | typically ~0.01–0.03 | **yes** — this is the one score this project actually computes itself, from rank position, discarding both raw scores above |
+| **hybrid** | Cross-encoder relevance score from `retrieval/reranker.py` (MS MARCO MiniLM logit) over the fused candidates. The Reciprocal Rank Fusion sum (`Σ 1 / (60 + rank)` per branch, ~0.01–0.03) is kept in node metadata as `rrf_score` | unbounded logit, can be negative | partly — fusion is this project's own code; the final score comes from the cross-encoder model. With `RERANKER_MODEL` empty, it falls back to the RRF sum |
 
 None of the three scales are comparable to each other or to "percent relevance."
