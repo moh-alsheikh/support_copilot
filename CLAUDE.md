@@ -18,9 +18,6 @@ The project's actual subject is making RAG answers verifiable, not just producin
   `row:15`, `$[4]`, `lines:20-35`, `line:12`) so a citation always means something concrete
   regardless of source format.
 
-`HANDOFF.md` has the project's origin story and cleanup history if you need it; it isn't required
-reading for day-to-day work in the codebase.
-
 ## Stack
 
 Pinned in `requirements.txt`: `llama-index-core==0.14.23` plus the Ollama/Chroma/BM25/file-reader

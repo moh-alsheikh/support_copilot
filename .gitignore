@@ -28,3 +28,5 @@ data/metadata/*.csv
 evaluation/reports/**/*.csv
 evaluation/reports/**/*.json
 .claude/
+# Local working notes, never published.
+HANDOFF.md
