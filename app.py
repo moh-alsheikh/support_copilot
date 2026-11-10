@@ -1,4 +1,4 @@
-"""Streamlit workbench for asking, corpus inspection, evaluation, and readiness review.
+"""Streamlit workbench for asking, corpus inspection, and evaluation.
 
 Usage:
     streamlit run app.py
@@ -22,28 +22,6 @@ from support_copilot.ingestion.processed_records import load_records
 from support_copilot.services.query_service import QueryService
 
 
-def _readiness_rows(path: Path) -> list[dict]:
-    """Load the saved readiness checklist or return practical defaults."""
-
-    if path.exists():
-        return pd.read_csv(path).fillna("").to_dict(orient="records")
-    # Grounded in this project's own documented gaps — see docs/ARCHITECTURE_ASSESSMENT.md and
-    # docs/THE_JOURNEY_TO_PRODUCTION.md for the reasoning behind each item.
-    items = [
-        "Knowledge base source and licensing confirmed; ownership and permission to use each document verified",
-        "Knowledge base spans text, structured, and OCR sources; all formats prepare successfully",
-        "Document register and metadata schema completed; duplicate/empty warnings reviewed",
-        "Local and/or hosted models selected and benchmarked for available hardware and latency",
-        "Evaluation set covers supported and unsupported questions; unsupported questions abstain",
-        "BM25, semantic, and hybrid baselines measured; citations manually verified",
-        "Incremental ingestion path decided — full-rebuild only holds up to this knowledge base's size",
-        "Vector/keyword store scaling path chosen for expected knowledge base growth",
-        "Orchestration and retry strategy decided for ingestion (currently a hand-run script)",
-        "Reproducible rebuild verified on a second environment",
-    ]
-    return [{"requirement": item, "completed": False, "owner": "", "notes": ""} for item in items]
-
-
 def main() -> None:
     """Render the complete quality workbench."""
 
@@ -57,8 +35,8 @@ def main() -> None:
         top_k = st.slider("Top-K", 1, 10, base_config.top_k)
         st.code(str(base_config.raw_data_dir), language=None)
 
-    ask_tab, corpus_tab, evaluation_tab, readiness_tab = st.tabs(
-        ["Ask Assistant", "Knowledge Base Health", "Evaluation Dashboard", "Readiness & Limitations"]
+    ask_tab, corpus_tab, evaluation_tab = st.tabs(
+        ["Ask Assistant", "Knowledge Base Health", "Evaluation Dashboard"]
     )
 
     with ask_tab:
@@ -160,15 +138,6 @@ def main() -> None:
                     st.download_button(path.name, path.read_bytes(), file_name=path.name)
             except Exception as exc:
                 st.error(str(exc))
-
-    with readiness_tab:
-        frame = pd.DataFrame(_readiness_rows(base_config.readiness_path))
-        # edited = st.data_editor(frame, use_container_width=True, num_rows="dynamic")
-        edited = st.data_editor(frame, width='stretch', num_rows="dynamic")
-        if st.button("Save readiness checklist"):
-            base_config.readiness_path.parent.mkdir(parents=True, exist_ok=True)
-            edited.to_csv(base_config.readiness_path, index=False)
-            st.success(f"Saved: {base_config.readiness_path}")
 
 
 if __name__ == "__main__":

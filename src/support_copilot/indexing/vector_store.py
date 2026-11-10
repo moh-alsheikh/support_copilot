@@ -1,4 +1,4 @@
-"""Own the persistent Chroma client and explicit full-rebuild behavior."""
+"""Own the persistent Chroma client and collection reset behavior."""
 
 import chromadb
 from llama_index.vector_stores.chroma import ChromaVectorStore
@@ -10,8 +10,8 @@ from llama_index.vector_stores.chroma import ChromaVectorStore
 # the same as cosine similarity because the current embedding model (nomic-embed-text) happens to
 # emit unit-normalized vectors — an assumption this constant now makes explicit instead of leaving
 # incidental. See docs/learning/vector-similarity-scoring.md. `hnsw:space` is fixed at collection
-# creation time, so changing it requires a full rebuild (`ingest_documents.py --force`), not just
-# a code change.
+# creation time; it is part of index_manager.vector_policy(), so changing it triggers a full
+# rebuild on the next ingestion run.
 DISTANCE_SPACE = "cosine"
 
 

@@ -38,7 +38,7 @@ cp .env.example .env
 # Pipeline, in order (each stage is a separate command deliberately: "ingest once, query many times")
 python prepare_corpus.py --check-dependencies   # check optional OCR deps
 python prepare_corpus.py                        # extract data/raw/* -> data/processed/document_records.jsonl
-python scripts/ingest_documents.py               # rebuild Chroma + BM25 (needs Ollama running); --force skips the overwrite confirmation
+python scripts/ingest_documents.py               # incremental update of Chroma + BM25 (needs Ollama); --full-rebuild / --force rebuild from scratch
 python scripts/inspect_index.py --mode semantic|bm25|hybrid   # inspect ranking without generation
 python scripts/ask.py --question "..."           # one question end to end: answer + cited sources (needs Ollama)
 python scripts/run_evaluation.py retrieval --mode hybrid --top-k 4 --run-name <name>
@@ -74,12 +74,18 @@ the package layout changes):
 
 Key mechanics worth knowing before touching retrieval or generation code:
 
-- **Two-stage preparation/indexing split, not incremental.** `prepare_corpus.py` extracts raw files
-  into `data/processed/document_records.jsonl` (source-of-truth normalized records, raw files never
-  touched). `scripts/ingest_documents.py` does a **full rebuild** of both Chroma and BM25 from those
-  records every time — this is deliberate, not a missing optimization (see
-  `docs/THE_JOURNEY_TO_PRODUCTION.md`). Repeating it produces the same collection size and never
-  duplicates nodes.
+- **Two-stage preparation/indexing split; indexing is incremental.** `prepare_corpus.py` extracts
+  raw files into `data/processed/document_records.jsonl` (source-of-truth normalized records, raw
+  files never touched; it still re-extracts every file each run). `ingest()` in
+  `indexing/index_manager.py` runs LlamaIndex's `IngestionPipeline` with a `SimpleDocumentStore`
+  (`storage/ingestion_pipeline/docstore.json`) and `DocstoreStrategy.UPSERTS_AND_DELETE`: only new
+  or changed records are split and embedded, and removed records' vectors are deleted. BM25 has no
+  incremental primitive, so it's rebuilt from every node read back from Chroma. A full rebuild
+  happens on request, when there's no docstore to diff against, or when `vector_policy()` changes
+  (chunk size/overlap, embedding model, distance space, `CHUNK_ID_SCHEME`) — bump that scheme if
+  you change how documents become nodes. Chunk IDs are deterministic (`<doc_id>:<n>`,
+  `ingestion/parsers.py`). Record IDs hash the record text, so an edited record shows up as one
+  added plus one removed document.
 - **Index manifest is a compatibility gate.** Every successful `ingest()` writes
   `storage/index_manifest.json` (node count, corpus SHA-256, chunk policy, embedding model,
   `BM25_POLICY_VERSION`). `load_index`/`load_bm25` in `indexing/index_manager.py` refuse to run
@@ -173,4 +179,4 @@ itself.
 - `docs/known-findings.md` — real diagnosed bugs with symptom/diagnosis/fix/lesson; check here first when something looks like a new bug.
 - `docs/DESIGN_QUESTIONS.md` — open architecture questions worth reasoning through before extending this project.
 - `docs/ARCHITECTURE_ASSESSMENT.md` — scored self-assessment (architecture, code design, production-readiness).
-- `docs/THE_JOURNEY_TO_PRODUCTION.md` — what's deliberately simplified at this scale vs. what changes at real scale (e.g. full-rebuild indexing).
+- `docs/THE_JOURNEY_TO_PRODUCTION.md` — what's deliberately simplified at this scale vs. what changes at real scale (e.g. single-process ingestion, in-memory BM25).

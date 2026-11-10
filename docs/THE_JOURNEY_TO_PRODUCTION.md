@@ -1,8 +1,9 @@
 # The Journey To Production
 
 This project is intentionally built at demo scale: a full run holds every Document, every Node,
-and every retrieved candidate in memory at once, and `prepare_corpus.py`/`ingest_documents.py`
-rebuild the entire corpus from scratch on every invocation. That is the right choice when the
+and every retrieved candidate in memory at once, and `prepare_corpus.py` re-extracts every file
+on every invocation (indexing is incremental, but runs in one process against a local document
+store and an in-memory BM25 index). That is the right choice when the
 corpus is one manual plus a handful of sample files and the goal is to make every step
 inspectable. It is the wrong choice for a real corpus measured in gigabytes or terabytes.
 
@@ -49,14 +50,15 @@ implements. Everything above it is what changes.
 
 Replace the local `data/raw/` folder and the JSON `document_register.py` file with object storage
 plus a real database row per source file: `(source_path, content_hash, last_processed_at,
-status)`. On each pipeline run, only files whose hash changed get reprocessed — the piece this
-project's full-rebuild approach deliberately skips for demo-scale simplicity.
+status)`. On each pipeline run, only files whose hash changed get reprocessed. This project already does
+that at the indexing stage (a local `SimpleDocumentStore` of per-record hashes), but not yet at
+extraction.
 
 | Concern | Tool / Framework | Notes |
 |---|---|---|
 | Raw file storage | Amazon S3, Google Cloud Storage, Azure Blob Storage | Durable, versioned, cheap at scale; supports event notifications |
 | Change-detection registry | PostgreSQL, SQLite (small scale), DynamoDB | One row per source file; hash + status + timestamps |
-| Incremental upsert primitive | LlamaIndex `IngestionPipeline` + `docstore` (Redis/MongoDB/Postgres-backed) | Built-in doc-hash-based skip logic — the direct upgrade from `index_manager.ingest()`'s full rebuild |
+| Incremental upsert primitive | LlamaIndex `IngestionPipeline` + `docstore` (Redis/MongoDB/Postgres-backed) | Built-in doc-hash-based skip logic — already used by `index_manager.ingest()` with a local `SimpleDocumentStore`; production swaps in a shared, database-backed docstore |
 
 ### 2. Extraction And OCR
 

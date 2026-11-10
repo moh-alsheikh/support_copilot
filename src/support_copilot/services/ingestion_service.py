@@ -1,6 +1,6 @@
-"""Application service for the complete index-build workflow."""
+"""Application service for the index-build workflow."""
 
-from support_copilot.indexing.index_manager import ingest
+from support_copilot.indexing.index_manager import IngestionReport, ingest
 
 
 class IngestionService:
@@ -11,7 +11,7 @@ class IngestionService:
 
         self.config = config
 
-    def run(self):
-        """Build fresh semantic and BM25 indexes."""
+    def run(self, *, full_rebuild: bool = False) -> IngestionReport:
+        """Update the indexes incrementally, or rebuild them from scratch when asked."""
 
-        return ingest(self.config)
+        return ingest(self.config, full_rebuild=full_rebuild)

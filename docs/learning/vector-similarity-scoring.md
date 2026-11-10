@@ -136,7 +136,9 @@ index rather than assumed:
 
 **If you pull this change without rebuilding, nothing breaks** — `get_collection()` still returns
 a working collection either way — but an existing local index keeps running on whatever space it
-was originally built with until you run `ingest_documents.py --force`.
+was originally built with until it's rebuilt. (Since incremental ingestion, `DISTANCE_SPACE` is part
+of the vector policy recorded in the manifest, so changing it triggers a full rebuild
+automatically on the next `ingest_documents.py` run.)
 
 ## BM25 scoring — a different mechanism entirely
 

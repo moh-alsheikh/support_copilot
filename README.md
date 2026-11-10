@@ -94,10 +94,11 @@ python prepare_corpus.py --check-dependencies
 # 2. Extract files and write normalized records.
 python prepare_corpus.py
 
-# 3. Rebuild Chroma and BM25 from normalized records.
+# 3. Update Chroma and BM25 from normalized records. Only new or changed records are embedded;
+#    an unchanged corpus finishes in seconds. The first run builds everything (~4 min on a CPU).
 python scripts/ingest_documents.py
-# Repeated automated build after reviewing generated state:
-python scripts/ingest_documents.py --force
+# Discard the indexes and rebuild from scratch (--force skips the confirmation prompt):
+python scripts/ingest_documents.py --full-rebuild
 
 # 4. Inspect ranking without generation. Without --question, the default is
 #    "Which power supply is recommended for the Raspberry Pi 5?".
@@ -181,11 +182,24 @@ Universal locations make evidence verifiable regardless of source format:
 
 ## Indexing behavior
 
-Indexing does a full rebuild of Chroma and BM25 on every run — deliberately simple, not
-incremental (see `docs/THE_JOURNEY_TO_PRODUCTION.md` for what changes at real scale). Repeating
-the command produces the same collection size, removes stale records, and never duplicates nodes.
-When indexes already exist, the script asks for confirmation; `--force` is the explicit automation
-path.
+Indexing is incremental. LlamaIndex's `IngestionPipeline` keeps a document store of per-record
+hashes (`storage/ingestion_pipeline/`), so each run splits and embeds only new or changed records
+and deletes the vectors of records that disappeared (`UPSERTS_AND_DELETE`). On the sample
+knowledge base, an unchanged re-run takes about 5 seconds instead of about 4.5 minutes. BM25 has no
+incremental mode, so it's rebuilt from all current nodes each run, which is cheap. The script
+reports what it did:
+
+```text
+Mode: incremental
+Documents: 323 (added 0, changed 0, removed 0, unchanged 323)
+Nodes embedded this run: 0
+```
+
+A full rebuild happens automatically when there is nothing to diff against (no index or document
+store yet) or when a setting that invalidates every vector changes (chunk size or overlap,
+embedding model, distance metric), and on request with `--full-rebuild` (asks to confirm) or
+`--force` (no prompt). Chunk IDs are deterministic, so rebuilding an unchanged corpus reproduces
+the same IDs and corpus fingerprint.
 
 Every successful build writes `storage/index_manifest.json`: node count, corpus SHA-256
 fingerprint, chunk policy, embedding model, and BM25 policy version. Query-time loading rejects a
@@ -258,8 +272,6 @@ Changing the prompt is appropriate only after the necessary evidence is confirme
   the document register.
 - **Evaluation Dashboard** — named retrieval/answer runs, metric chart, reports, and rubric
   downloads.
-- **Readiness & Limitations** — an editable production-readiness checklist grounded in this
-  project's own documented gaps (see `docs/THE_JOURNEY_TO_PRODUCTION.md`).
 
 Ollama is the local default (fully offline). Anthropic is an explicit, opt-in online comparison
 provider and requires `LLM_PROVIDER=anthropic` plus `ANTHROPIC_API_KEY`.
@@ -279,7 +291,7 @@ metrics. No test requires internet, Ollama, Tesseract, or the sample knowledge b
 
 - Missing processed JSONL: run `python prepare_corpus.py`.
 - Empty/missing index: run `python scripts/ingest_documents.py`.
-- Existing index replacement: review it, then confirm, or use `--force` for an intentional rebuild.
+- Index looks stale or inconsistent: run `python scripts/ingest_documents.py --full-rebuild`.
 - Missing/incompatible manifest: rebuild both indexes; don't copy only one generated directory.
 - OCR dependency warning: text formats still work; see `OCR_SETUP.md` for scanned sources.
 - Ollama connection failure: start Ollama and verify both models with `ollama list`.

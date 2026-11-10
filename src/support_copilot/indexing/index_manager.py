@@ -1,27 +1,75 @@
 """Build matching Chroma and BM25 indexes with a verifiable storage manifest.
 
-This project uses an explicit full rebuild so deleted source records cannot leave stale vectors.
-The command-line script asks for confirmation before replacing existing generated indexes. A
-manifest records the corpus fingerprint and indexing policy so query-time code can reject an
+Vector indexing is incremental: LlamaIndex's `IngestionPipeline` keeps a document store of
+per-document hashes, so a run only splits and embeds new or changed documents and, with
+`UPSERTS_AND_DELETE`, removes the vectors of documents that disappeared. That keeps the guarantee
+the old full rebuild existed for (deleted records leave no stale vectors) without re-embedding an
+unchanged corpus. BM25 has no incremental primitive and is cheap, so it is rebuilt from every node
+currently in Chroma. A full rebuild still happens on request, when there is no document store to
+diff against, or when the vector policy (chunking, embedding model, distance, chunk IDs) changed,
+since those invalidate existing vectors without changing any document hash.
+
+A manifest records the corpus fingerprint and indexing policy so query-time code can reject an
 incompatible BM25 artifact instead of returning quietly misleading rankings.
 """
 
+from dataclasses import dataclass
 import hashlib
 import json
 from pathlib import Path
 import shutil
 
-from llama_index.core import StorageContext, VectorStoreIndex
+from llama_index.core import Settings, VectorStoreIndex
+from llama_index.core.ingestion import DocstoreStrategy, IngestionPipeline
+from llama_index.core.storage.docstore import SimpleDocumentStore
 from llama_index.retrievers.bm25 import BM25Retriever
 
-from support_copilot.indexing.vector_store import get_collection, get_vector_store
-from support_copilot.ingestion.pipeline import build_nodes
+from support_copilot.indexing.vector_store import DISTANCE_SPACE, get_collection, get_vector_store
+from support_copilot.ingestion.document_adapter import load_documents
+from support_copilot.ingestion.parsers import build_parser
 
 BM25_POLICY_VERSION = 2
 # bm25s's default pattern (\b\w\w+\b) drops one-character tokens, so digits that distinguish
 # otherwise-identical rows ("0 long, 7 short flashes", "Pi 5" vs "Pi 4") are never matched.
 BM25_TOKEN_PATTERN = r"(?u)\b\w+\b"
 MANIFEST_NAME = "index_manifest.json"
+PIPELINE_DIR = "ingestion_pipeline"
+DOCSTORE_NAME = "docstore.json"
+# Bump when chunk IDs or how documents become nodes change in a way existing vectors can't absorb.
+CHUNK_ID_SCHEME = 1
+
+
+@dataclass
+class IngestionReport:
+    """What one ingestion run did, for the CLI and tests."""
+
+    mode: str
+    reason: str
+    documents: int
+    added: int
+    changed: int
+    removed: int
+    unchanged: int
+    nodes_embedded: int
+    nodes_total: int
+
+
+def vector_policy(config) -> dict:
+    """Settings that, if changed, make every existing vector stale even when no document changed."""
+
+    return {
+        "chunk_size": config.chunk_size,
+        "chunk_overlap": config.chunk_overlap,
+        "embedding_model": config.embedding_model,
+        "distance_space": DISTANCE_SPACE,
+        "chunk_id_scheme": CHUNK_ID_SCHEME,
+    }
+
+
+def pipeline_dir(config) -> Path:
+    """Return the directory holding the ingestion pipeline's document store."""
+
+    return config.storage_dir / PIPELINE_DIR
 
 
 def manifest_path(config) -> Path:
@@ -46,7 +94,12 @@ def has_existing_indexes(config) -> bool:
     """Detect generated state that a full rebuild will replace."""
 
     bm25_path = config.storage_dir / "bm25"
-    return bm25_path.exists() or manifest_path(config).exists() or get_collection(config).count() > 0
+    return (
+        bm25_path.exists()
+        or manifest_path(config).exists()
+        or pipeline_dir(config).exists()
+        or get_collection(config).count() > 0
+    )
 
 
 def write_manifest(config, nodes) -> Path:
@@ -61,6 +114,7 @@ def write_manifest(config, nodes) -> Path:
         "chunk_size": config.chunk_size,
         "chunk_overlap": config.chunk_overlap,
         "embedding_model": config.embedding_model,
+        "vector_policy": vector_policy(config),
     }
     path = manifest_path(config)
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -79,25 +133,80 @@ def load_manifest(config) -> dict:
     return payload
 
 
-def ingest(config):
-    """Rebuild semantic and BM25 indexes from all normalized records."""
+def _full_rebuild_reason(config, docstore_path: Path) -> str | None:
+    """Explain why existing vectors can't be updated incrementally, or None if they can."""
 
-    documents, nodes = build_nodes(config)
-    if not nodes:
-        raise ValueError("No searchable nodes were produced. Inspect corpus preparation warnings.")
+    if get_collection(config).count() == 0:
+        return "no existing vector index"
+    if not docstore_path.exists():
+        return "no ingestion document store (index was built by full-rebuild code)"
+    path = manifest_path(config)
+    if not path.exists():
+        return "index manifest is missing"
+    recorded = json.loads(path.read_text(encoding="utf-8")).get("vector_policy")
+    if recorded != vector_policy(config):
+        return f"vector policy changed (was {recorded}, now {vector_policy(config)})"
+    return None
 
-    vector_store = get_vector_store(config, reset=True)
-    storage_context = StorageContext.from_defaults(vector_store=vector_store)
-    index = VectorStoreIndex(nodes, storage_context=storage_context)
 
+def _rebuild_bm25(config, nodes) -> None:
     bm25_path = config.storage_dir / "bm25"
     if bm25_path.exists():
         shutil.rmtree(bm25_path)
     BM25Retriever.from_defaults(
         nodes=nodes, similarity_top_k=config.top_k, token_pattern=BM25_TOKEN_PATTERN
     ).persist(str(bm25_path))
+
+
+def ingest(config, *, full_rebuild: bool = False) -> IngestionReport:
+    """Update Chroma incrementally from normalized records, then rebuild BM25 and the manifest."""
+
+    documents = load_documents(config)
+    if not documents:
+        raise ValueError("No prepared records were found. Inspect corpus preparation warnings.")
+
+    docstore_path = pipeline_dir(config) / DOCSTORE_NAME
+    reason = "requested" if full_rebuild else _full_rebuild_reason(config, docstore_path)
+    full = reason is not None
+    if full and pipeline_dir(config).exists():
+        shutil.rmtree(pipeline_dir(config))
+    docstore = SimpleDocumentStore() if full else SimpleDocumentStore.from_persist_path(str(docstore_path))
+
+    current = {document.doc_id: document.hash for document in documents}
+    previous = {doc_id: hash_ for hash_, doc_id in docstore.get_all_document_hashes().items()}
+    added = sum(doc_id not in previous for doc_id in current)
+    changed = sum(doc_id in previous and previous[doc_id] != hash_ for doc_id, hash_ in current.items())
+    removed = sum(doc_id not in current for doc_id in previous)
+
+    vector_store = get_vector_store(config, reset=full)
+    pipeline = IngestionPipeline(
+        transformations=[build_parser(config), Settings.embed_model],
+        vector_store=vector_store,
+        docstore=docstore,
+        docstore_strategy=DocstoreStrategy.UPSERTS_AND_DELETE,
+        disable_cache=True,
+    )
+    # store_doc_text must stay on: UPSERTS_AND_DELETE removes documents with docstore.delete_document(),
+    # which raises for documents stored without text.
+    embedded = pipeline.run(documents=documents)
+    pipeline.persist(str(pipeline_dir(config)), docstore_name=DOCSTORE_NAME)
+
+    nodes = sorted(vector_store.get_nodes(None), key=lambda node: node.node_id)
+    if not nodes:
+        raise ValueError("No searchable nodes were produced. Inspect corpus preparation warnings.")
+    _rebuild_bm25(config, nodes)
     write_manifest(config, nodes)
-    return index, documents, nodes
+    return IngestionReport(
+        mode="full" if full else "incremental",
+        reason=reason or "",
+        documents=len(documents),
+        added=added,
+        changed=changed,
+        removed=removed,
+        unchanged=len(current) - added - changed,
+        nodes_embedded=len(embedded),
+        nodes_total=len(nodes),
+    )
 
 
 def load_index(config):

@@ -6,6 +6,6 @@ answered in depth in [`THE_JOURNEY_TO_PRODUCTION.md`](THE_JOURNEY_TO_PRODUCTION.
 
 - Which code is framework-specific, and which code would survive a framework change?
 - Why does preparation precede LlamaIndex Documents?
-- Why does this project full-rebuild indexes on every run instead of using incremental upserts?
+- Incremental upserts skip unchanged documents, so which settings changes must still force a full rebuild, and why?
 - What new operational problems would Pinecone or pgvector introduce?
 - Which kind of user question would justify an agentic workflow instead of single-shot retrieval?

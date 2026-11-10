@@ -16,9 +16,9 @@ wrong rankings.
 
 Points held back: `indexing/`, `retrieval/`, and `generation/` import LlamaIndex types directly
 rather than behind an interface, so a framework swap would still ripple across multiple packages —
-this is a layered/service-façade architecture, not a full hexagonal/ports-and-adapters design. The
-indexing story is also full-rebuild-only (`reset=True` on every `ingest()` call), which is fine at
-this corpus size but is an architectural choice that doesn't extend past it.
+this is a layered/service-façade architecture, not a full hexagonal/ports-and-adapters design. Indexing
+is incremental (LlamaIndex `IngestionPipeline` with a local document store), but BM25 is still
+rebuilt in full each run and preparation still re-extracts every file.
 
 ## Design (Code-Level): 8/10
 
@@ -39,8 +39,8 @@ demo-scale corpus, not a pattern to copy at real scale.
 ## As A Startup/Production Project: 4/10
 
 This is the expected score, not a flaw — the project is a working prototype, not a shipped
-product. No incremental ingestion (every `prepare_corpus.py`/`ingest_documents.py` run reprocesses
-everything from scratch), no horizontal scale on Chroma or the pickled BM25 index, no
+product. Indexing is incremental, but preparation still re-extracts every file and BM25 is rebuilt in
+full on each run; no horizontal scale on Chroma or the pickled BM25 index, no
 retry/orchestration layer, local-only Ollama and Chroma, single-process throughout.
 `THE_JOURNEY_TO_PRODUCTION.md` exists precisely because closing this gap is real, deliberate
 follow-on work — not an oversight in this codebase.

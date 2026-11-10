@@ -97,7 +97,7 @@ MacPorts provides a working Poppler for these systems.
 
    ```bash
    python prepare_corpus.py
-   python scripts/ingest_documents.py --force
+   python scripts/ingest_documents.py
    ```
 
 7. Optional housekeeping, once nothing else is running:

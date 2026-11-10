@@ -11,7 +11,7 @@ item by item against the code rather than the docs.
 
 ## Summary
 
-**Overall: 15 of 88 points — about 17%.**
+**Overall: 15.5 of 88 points — about 18%.** (Re-scored 2026-11-10 after incremental indexing.)
 
 | # | Section | Items | Points | Coverage |
 |---|---|---:|---:|---:|
@@ -26,13 +26,13 @@ item by item against the code rather than the docs.
 | 9 | Multimodal & Specialized RAG | 5 | 1 | 20% |
 | 10 | Training & Fine-Tuning for RAG | 5 | 0 | 0% |
 | 11 | Evaluation & Observability | 6 | 2.5 | 42% |
-| 12 | Production & Enterprise | 8 | 0 | 0% |
-| | **Total** | **88** | **15** | **17%** |
+| 12 | Production & Enterprise | 8 | 0.5 | 6% |
+| | **Total** | **88** | **15.5** | **18%** |
 
-### How to read the 17%
+### How to read the 18%
 
 The catalog is a menu, not a checklist. Many items are alternatives to each other: no system uses
-every chunking strategy or every agent pattern. So 17% measures breadth, not quality.
+every chunking strategy or every agent pattern. So 18% measures breadth, not quality.
 
 What matters is where the coverage sits. The only sections above 30% are the ones this project
 exists to demonstrate:
@@ -41,7 +41,7 @@ exists to demonstrate:
 - **§8** citations and abstention
 - **§11** retrieval evaluation
 
-Five sections are at 0%: query transformation, agentic, graph, training, and production. That
+Four sections are at 0%: query transformation, agentic, graph, and training. Production is at 6%. That
 matches the scope described in [`ARCHITECTURE_ASSESSMENT.md`](ARCHITECTURE_ASSESSMENT.md): the
 project is a verifiable-grounding prototype, not a survey of techniques.
 
@@ -153,11 +153,14 @@ None of the 5 items. All models are used off the shelf.
 | Failure taxonomy | 🟡 | Six-stage failure boundaries (README), real diagnosed cases in `known-findings.md`, and a false-abstention (wrongful refusal) metric |
 | Human vs LLM-as-judge | 🟡 | `manual_rubric()` exports human 0–2 scores for correctness, faithfulness, completeness, and citation accuracy. No LLM judge |
 
-### 12. Production & Enterprise — 0%
+### 12. Production & Enterprise — 6%
 
-None of the 8 items. Incremental indexing is recorded in [`BACKLOG.md`](BACKLOG.md), with an
-intended LlamaIndex approach, but is not built. Caching, access control, scaling, cost tiering,
-personalization, and privacy-preserving search are covered only as a plan in
+| Technique | Status | Evidence |
+|---|:---:|---|
+| Freshness & real-time indexing | 🟡 | Incremental indexing: `index_manager.ingest()` runs LlamaIndex's `IngestionPipeline` with a local `SimpleDocumentStore` and `UPSERTS_AND_DELETE`, embedding only new or changed records and deleting removed ones. No change-data capture or real-time trigger; runs are manual, and extraction still reprocesses every file |
+
+The other 7 items (caching, invalidation, access control, scaling, cost tiering, personalization,
+privacy-preserving search) are covered only as a plan in
 [`THE_JOURNEY_TO_PRODUCTION.md`](THE_JOURNEY_TO_PRODUCTION.md).
 
 ## Judgment calls
