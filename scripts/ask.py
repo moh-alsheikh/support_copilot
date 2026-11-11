@@ -13,7 +13,7 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from support_copilot.config import AppConfig, configure_llamaindex
-from support_copilot.evaluation.evaluators import citation_markers
+from support_copilot.generation.attribution import citation_markers
 from support_copilot.services.query_service import QueryService
 
 
@@ -34,6 +34,10 @@ def main() -> None:
 
     cited = citation_markers(result.answer)
     print(f"ANSWER ({config.llm_model}, {elapsed:.1f}s)\n{result.answer}\n")
+    if result.unverified_claims:
+        print("WARNING: no retrieved source supports the sentences marked [Unverified].\n")
+    if result.model_answer != result.answer:
+        print(f"RAW MODEL ANSWER (citations above were attached by code)\n{result.model_answer}\n")
     print("SOURCES (* = cited in the answer)")
     for citation in result.citations:
         mark = "*" if citation.number in cited else " "

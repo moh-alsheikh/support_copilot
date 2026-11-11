@@ -219,8 +219,13 @@ full reasoning and verification.
 - fused evidence retains semantic and BM25 component ranks for the UI and error analysis;
 - no evidence returns the exact abstention message without calling a provider;
 - QA and refine prompts both forbid outside knowledge and invented facts;
-- each context block has a stable `[Source N]` label, source, universal location, and chunk ID;
+- each context block has a stable `[Source N]` label, source, and universal location, and no
+  other metadata;
 - citation rows come from retrieved Node metadata, never from model output;
+- `[Source N]` markers in the answer are attached by code (`generation/attribution.py`): each
+  sentence is cited to the evidence whose text supports it (its values appear there, and most of
+  its words do). The model's own markers are kept only when that check confirms them, and a
+  sentence no source supports is labelled `[Unverified]` rather than given a guessed citation;
 - citation numbers stay tied to evidence positions, even for duplicate locations;
 - a response beginning with the abstention message and then adding claims is normalized back to
   the exact message.
@@ -237,7 +242,14 @@ separately.
 
 Answer reports record evidence, universal citations, latency, provider, model, retrieval mode,
 citation marker validity, false answers, false abstentions, and whether expected evidence was
-cited. These deterministic checks are a smoke signal, not a substitute for the human 0/1/2 rubric.
+cited. Each sentence that cites `[Source N]` is also checked against the text of the sources it
+cites: values it states (`3A`, `600mA`, `8000 RPM`) must appear there, and most of its words should.
+That catches invented values and claims pinned to the wrong source, which citation validity alone
+misses. Because markers are now attached by code with the same rules, cited sentences pass these
+checks by construction; the signal moves to `unverified_claims`. `model_citation_fixes` records
+where code's citation differs from the model's own (the raw text is in the `model_answer` column).
+`needs_review` combines every signal, and each run writes `answer_summary.json` listing the
+flagged questions. These checks are lexical triage, not a substitute for the human 0/1/2 rubric.
 
 ## Package reading path
 
@@ -248,7 +260,7 @@ cited. These deterministic checks are a smoke signal, not a substitute for the h
 | indexing | `indexing/index_manager.py` | same Nodes into Chroma and BM25 plus manifest |
 | retrieval | `retrieval/retriever.py` | candidate K, branch results, RRF, rerank |
 | generation | `generation/prompts.py`, `generation/synthesizer.py` | `[Source N]` into normalized answer |
-| citations | `generation/citations.py` | evidence position to source/location row |
+| citations | `generation/attribution.py`, `generation/citations.py` | sentence to supporting `[Source N]`, evidence position to source/location row |
 | evaluation | `evaluation/runner.py`, `evaluation/evaluators.py` | expected pair to metric and failure row |
 | interfaces | `services/`, `app.py`, `scripts/` | one service reused by CLI, UI, and reports |
 

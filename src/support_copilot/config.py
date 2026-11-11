@@ -40,6 +40,9 @@ class AppConfig:
     anthropic_model: str = "claude-sonnet-5-5"
     collection_name: str = "technical_evidence"
     reranker_model: str = "Xenova/ms-marco-MiniLM-L-6-v2"
+    # nomic-embed-text is trained with these task prefixes; other embedding models may need none.
+    embedding_query_prefix: str = "search_query:"
+    embedding_document_prefix: str = "search_document:"
     request_timeout: float = 360.0
     top_k: int = 4
     chunk_size: int = 512
@@ -71,6 +74,8 @@ class AppConfig:
             anthropic_model=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5"),
             collection_name=os.getenv("COLLECTION_NAME", "technical_evidence"),
             reranker_model=os.getenv("RERANKER_MODEL", "Xenova/ms-marco-MiniLM-L-6-v2").strip(),
+            embedding_query_prefix=os.getenv("EMBEDDING_QUERY_PREFIX", "search_query:").strip(),
+            embedding_document_prefix=os.getenv("EMBEDDING_DOCUMENT_PREFIX", "search_document:").strip(),
             request_timeout=float(os.getenv("OLLAMA_REQUEST_TIMEOUT", "360")),
             top_k=int(os.getenv("TOP_K", "4")),
             chunk_size=int(os.getenv("CHUNK_SIZE", "512")),
@@ -95,4 +100,8 @@ def configure_llamaindex(config: AppConfig) -> None:
         Settings.llm = Anthropic(model=config.anthropic_model, api_key=config.anthropic_api_key)
     else:
         raise ValueError("LLM_PROVIDER must be 'ollama' or 'anthropic'.")
-    Settings.embed_model = OllamaEmbedding(model_name=config.embedding_model)
+    Settings.embed_model = OllamaEmbedding(
+        model_name=config.embedding_model,
+        query_instruction=config.embedding_query_prefix or None,
+        text_instruction=config.embedding_document_prefix or None,
+    )

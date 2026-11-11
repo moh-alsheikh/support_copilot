@@ -17,7 +17,12 @@ def evidence_location(metadata: dict) -> str:
 
 
 def number_evidence(evidence):
-    """Create numbered node copies so answer markers have one explicit meaning."""
+    """Create numbered node copies so answer markers have one explicit meaning.
+
+    The prompt shows only the label, file, location, and content. Every metadata key is excluded
+    from the LLM view: otherwise LlamaIndex prints all of it (hashes, IDs, ranking scores) above
+    each block, where it reads as the tail of the previous source and blurs the label boundaries.
+    """
 
     numbered = []
     for number, item in enumerate(evidence, start=1):
@@ -28,12 +33,17 @@ def number_evidence(evidence):
                 f"[Source {number}]",
                 f"File: {source}",
                 f"Location: {evidence_location(metadata)}",
-                f"Chunk ID: {item.node.node_id}",
                 "Content:",
                 item.node.get_content(),
             ]
         )
-        node = TextNode(id_=item.node.node_id, text=text, metadata=metadata)
+        node = TextNode(
+            id_=item.node.node_id,
+            text=text,
+            metadata=metadata,
+            excluded_llm_metadata_keys=list(metadata),
+            excluded_embed_metadata_keys=list(metadata),
+        )
         numbered.append(NodeWithScore(node=node, score=item.score))
     return numbered
 

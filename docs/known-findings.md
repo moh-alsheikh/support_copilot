@@ -46,3 +46,21 @@ shame.
 - **Where it matters:** any exact-string answer check downstream (automated grading, evaluation
   scripts). Compare identifiers with artifact-tolerant logic or verify manually — don't trust
   visual inspection of an extracted string.
+
+## F5. Node metadata leaked into the prompt and blurred the source labels
+
+- **Symptom:** on the Raspberry Pi knowledge base, `llama3.2:3b` gave correct answers with no
+  `[Source N]` marker at all (Q007, Q012, Q019 in run `answers-after-retrieval-upgrades`),
+  although the right evidence was retrieved and labelled.
+- **Diagnosis:** recording the exact prompt showed that `number_evidence()` copied each node's
+  full metadata onto the new prompt node without excluding it from the LLM view, so LlamaIndex
+  printed `source`, `doc_id`, `content_hash`, `semantic_rank`, `bm25_rank`, `rrf_score`, … above
+  every `[Source N]` block. Each dump sat directly after the previous source's content, so it read
+  as part of the wrong source, and about a third of the 7.4k-character prompt was noise. The
+  metadata exclusions set at ingestion didn't help, because the prompt node is a fresh copy.
+- **Fix:** `number_evidence()` excludes every metadata key from the LLM and embedding views and
+  drops the chunk-ID hash line; the block is now label, file, location, content. Covered by
+  `test_prompt_evidence_shows_no_metadata_dump`. Citations are also no longer left to the model:
+  `generation/attribution.py` attaches them in code (see `grounding-abstention-citations.md`).
+- **Lesson:** read the prompt the model actually receives, not the template. Framework defaults
+  (here, metadata printing in `MetadataMode.LLM`) can rewrite it.

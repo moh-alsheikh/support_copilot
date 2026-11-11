@@ -52,6 +52,13 @@ def main() -> None:
                 result = QueryService(config).answer(question, top_k=top_k, mode=mode or "hybrid")
                 st.subheader("Answer")
                 st.write(result.answer)
+                if result.unverified_claims:
+                    st.warning(
+                        "No retrieved source supports the sentences marked [Unverified]; "
+                        "check them against the evidence below."
+                    )
+                with st.expander("Raw model answer (before code-attached citations)"):
+                    st.text(result.model_answer)
                 st.subheader("Sources")
                 st.dataframe(pd.DataFrame([item.__dict__ for item in result.citations]), hide_index=True)
                 with st.expander("Retrieved evidence", expanded=True):

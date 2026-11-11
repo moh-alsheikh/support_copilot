@@ -64,6 +64,8 @@ def vector_policy(config) -> dict:
         "distance_space": DISTANCE_SPACE,
         "chunk_id_scheme": CHUNK_ID_SCHEME,
         "embedded_metadata_keys": list(EMBEDDED_METADATA_KEYS),
+        "embedding_query_prefix": config.embedding_query_prefix,
+        "embedding_document_prefix": config.embedding_document_prefix,
     }
 
 

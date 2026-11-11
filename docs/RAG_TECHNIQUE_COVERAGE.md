@@ -11,12 +11,12 @@ item by item against the code rather than the docs.
 
 ## Summary
 
-**Overall: 16.5 of 88 points — about 19%.** (Re-scored 2026-11-10 after incremental indexing and the cross-encoder reranker.)
+**Overall: 18 of 88 points — about 20%.** (Re-scored 2026-11-11 after incremental indexing, the cross-encoder reranker, and Nomic task prefixes.)
 
 | # | Section | Items | Points | Coverage |
 |---|---|---:|---:|---:|
 | 1 | Document Ingestion & Chunking | 10 | 2.5 | 25% |
-| 2 | Embedding & Representation | 9 | 2.5 | 28% |
+| 2 | Embedding & Representation | 9 | 4 | 44% |
 | 3 | Indexing & Storage Architecture | 6 | 3 | 50% |
 | 4 | Query Understanding & Transformation | 7 | 0 | 0% |
 | 5 | Retrieval Strategies | 10 | 2 | 20% |
@@ -27,12 +27,12 @@ item by item against the code rather than the docs.
 | 10 | Training & Fine-Tuning for RAG | 5 | 0 | 0% |
 | 11 | Evaluation & Observability | 6 | 2.5 | 42% |
 | 12 | Production & Enterprise | 8 | 0.5 | 6% |
-| | **Total** | **88** | **16.5** | **19%** |
+| | **Total** | **88** | **18** | **20%** |
 
-### How to read the 19%
+### How to read the 20%
 
 The catalog is a menu, not a checklist. Many items are alternatives to each other: no system uses
-every chunking strategy or every agent pattern. So 19% measures breadth, not quality.
+every chunking strategy or every agent pattern. So 20% measures breadth, not quality.
 
 What matters is where the coverage sits. The only sections above 30% are the ones this project
 exists to demonstrate:
@@ -67,8 +67,8 @@ project is a verifiable-grounding prototype, not a survey of techniques.
 | Technique | Status | Evidence |
 |---|:---:|---|
 | Bi-encoder vs cross-encoder | ✅ | Bi-encoder retrieval with `nomic-embed-text` via Ollama. There is no cross-encoder anywhere (see §3, re-ranking) |
-| Asymmetric embeddings | ❌ | Nomic expects `search_query:` / `search_document:` prefixes, but `config.py` builds `OllamaEmbedding(model_name=...)` without `query_instruction` / `text_instruction`, so queries and documents are embedded identically |
-| Instruction-tuned embedders | 🟡 | Nomic is instruction-tuned but is used without its task prefixes (row above) |
+| Asymmetric embeddings | ✅ | Questions are embedded with `search_query:` and documents with `search_document:` (`EMBEDDING_QUERY_PREFIX` / `EMBEDDING_DOCUMENT_PREFIX`, passed to `OllamaEmbedding` in `config.py`). Semantic Recall@4 0.733 → 0.863 |
+| Instruction-tuned embedders | ✅ | `nomic-embed-text`, used with the task prefixes it was trained with (row above) |
 | Matryoshka (MRL) | ❌ | — |
 | Late interaction (ColBERT, ColPali) | ❌ | — |
 | Sparse-dense hybrid | ✅ | BM25 (`bm25s`) plus dense vectors (Chroma), fused in `retrieval/retriever.py` |
@@ -147,7 +147,7 @@ None of the 5 items. All models are used off the shelf.
 | Technique | Status | Evidence |
 |---|:---:|---|
 | Retrieval metrics | ✅ | Hit@K, Recall@K, context precision, and MRR over pair-aware `(source, location)` ground truth (`evaluation/evaluators.py`). nDCG is missing |
-| Generation metrics | 🟡 | Deterministic `answer_checks()`: expected answer contained, abstention correctness, false answers, false abstentions, invalid citation markers, citations not in retrieved evidence, expected evidence cited. No semantic faithfulness or relevancy scoring |
+| Generation metrics | 🟡 | Deterministic `answer_checks()`: expected answer contained, abstention correctness, false answers/abstentions, invalid citation markers, citations not in retrieved evidence, expected evidence cited, plus per-sentence claim support against the cited text (`unsupported_values`, `weakly_supported_claims`) and a combined `needs_review`. Lexical only: no semantic faithfulness or relevancy scoring |
 | RAG Triad | ❌ | — |
 | Frameworks (RAGAS, ARES, TruLens, DeepEval) | ❌ | — |
 | Failure taxonomy | 🟡 | Six-stage failure boundaries (README), real diagnosed cases in `known-findings.md`, and a false-abstention (wrongful refusal) metric |
@@ -178,10 +178,7 @@ Four scores could reasonably go either way. Each is stated here so the total can
 
 These strengthen what the project already claims to do, rather than adding breadth:
 
-1. **Use Nomic's task prefixes.** Pass `query_instruction="search_query:"` and
-   `text_instruction="search_document:"` to `OllamaEmbedding` in `configure_llamaindex()`. It's a
-   small code change, but existing vectors were embedded without the prefix, so it needs an
-   `ingest_documents.py --force` rebuild. Fixes the §2 asymmetric-embedding gap.
+1. ~~Use Nomic's task prefixes.~~ Done 2026-11-11 (§2).
 2. ~~Replace the lexical reranker with a cross-encoder.~~ Done 2026-11-10 (§3, §5).
 3. **Add nDCG to `evaluation/evaluators.py`.** It completes the §11 retrieval metrics set.
 

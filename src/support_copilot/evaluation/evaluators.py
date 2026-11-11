@@ -1,11 +1,27 @@
 """Pair-aware retrieval metrics and deterministic answer/citation checks.
 
-The program checks facts it can know: retrieved identities, source-label ranges, and exact
-abstention behavior. Human reviewers remain authoritative for correctness and faithfulness.
+The program checks facts it can know: retrieved identities, source-label ranges, exact abstention
+behavior, and whether each cited sentence is backed by the text of the sources it cites (values it
+states must appear there, and most of its words should). Since `[Source N]` markers are attached by
+code (`generation/attribution.py`) using the same rules, cited sentences pass those checks by
+construction; the signal moves to `unverified_claims`, the sentences code could not support. Those claim checks are lexical, so they
+catch invented values and claims pinned to the wrong source, but not a sentence that reuses the
+source's words to say something it doesn't mean. Human reviewers remain authoritative for
+correctness and faithfulness; `needs_review` tells them where to look first.
 """
 
 import re
 
+from support_copilot.generation.attribution import (
+    MARKER,
+    SUPPORT_THRESHOLD,
+    citation_markers,
+    sentences,
+    support_text,
+    unsupported_values,
+    values as _values,
+    word_support,
+)
 from support_copilot.generation.prompts import ABSTENTION_MESSAGE
 
 
@@ -80,17 +96,72 @@ def summarize(rows: list[dict]) -> dict:
     }
 
 
-def citation_markers(answer: str) -> set[int]:
-    """Return explicit `[Source N]` markers from generated prose."""
+def _contains_phrase(text: str, phrase: str) -> bool:
+    """Match the phrase at a word start, so an expected "no" doesn't match inside "know".
 
-    return {int(value) for value in re.findall(r"\[Source\s+(\d+)\]", answer, re.IGNORECASE)}
+    After the phrase, numbers may carry a unit ("600" matches "600mA") and longer words may carry
+    a suffix ("overheat" matches "overheating"); short words like "no" must end at a boundary, or
+    they would match "not" and "none".
+    """
+
+    phrase = _normalized_words(phrase)
+    if not phrase:
+        return False
+    if phrase[-1].isdigit():
+        tail = r"(?![0-9])"
+    elif len(phrase) <= 3:
+        tail = r"(?![a-z0-9])"
+    else:
+        tail = ""
+    return re.search(rf"(?<![a-z0-9]){re.escape(phrase)}{tail}", _normalized_words(text)) is not None
 
 
-def answer_checks(answer: str, case: dict, citations: list[dict], evidence) -> dict:
-    """Check abstention, label validity, and expected cited evidence deterministically."""
+def _normalized_words(text: str) -> str:
+    return " ".join(re.sub(r"[^\w]+", " ", text.lower()).split())
 
-    normalized_answer = " ".join(re.sub(r"[^\w]+", " ", answer.lower()).split())
-    normalized_expected = " ".join(re.sub(r"[^\w]+", " ", case["expected_answer"].lower()).split())
+
+def claim_checks(answer: str, evidence_texts: list[str]) -> dict:
+    """Check each sentence that cites `[Source N]` against the text of exactly those sources.
+
+    `evidence_texts[n - 1]` is the text shown to the model as `[Source n]`. Sentences citing only
+    nonexistent sources are skipped here (they are already counted as invalid markers).
+    """
+
+    missing_values: list[str] = []
+    weak_claims: list[str] = []
+    uncited_values: list[str] = []
+    checked = 0
+    for sentence in sentences(answer):
+        markers = citation_markers(sentence)
+        claim = MARKER.sub(" ", sentence)
+        if not markers:
+            uncited_values.extend(sorted(_values(claim)))
+            continue
+        cited = " ".join(evidence_texts[n - 1] for n in sorted(markers) if 1 <= n <= len(evidence_texts))
+        if not cited:
+            continue
+        checked += 1
+        missing_values.extend(unsupported_values(claim, cited))
+        overlap = word_support(claim, cited)
+        if overlap is not None and overlap < SUPPORT_THRESHOLD:
+            weak_claims.append(claim.strip()[:160])
+    return {
+        "claims_checked": checked,
+        "unsupported_values": missing_values,
+        "weakly_supported_claims": weak_claims,
+        "uncited_values": uncited_values,
+    }
+
+
+def answer_checks(answer: str, case: dict, citations: list[dict], evidence, claims=None) -> dict:
+    """Check abstention, label validity, expected evidence, and claim support deterministically.
+
+    `claims` are the per-sentence attributions from `generation/attribution.py`, when the answer
+    went through it. They add `unverified_claims` (sentences no source supports, shown to the user
+    as `[Unverified]`) and `model_citation_fixes` (sentences where code's citation differs from the
+    model's own marker, a diagnostic of how well the model cites).
+    """
+
     abstained = ABSTENTION_MESSAGE.lower() in answer.lower()
     unsupported = case["question_type"] == "unsupported"
     markers = citation_markers(answer)
@@ -99,16 +170,72 @@ def answer_checks(answer: str, case: dict, citations: list[dict], evidence) -> d
     cited_identities = {citations_by_number[number] for number in markers if number in citations_by_number}
     retrieved_identities = {evidence_identity(item) for item in evidence}
     expected = expected_evidence(case)
-    return {
-        "answer_contains_expected": bool(normalized_expected) and normalized_expected in normalized_answer,
+    contains_expected = _contains_phrase(answer, case["expected_answer"])
+    claim_results = claim_checks(answer, [support_text(item.node) for item in evidence]) if not abstained else claim_checks("", [])
+    row = {
+        "answer_contains_expected": contains_expected,
         "abstained": abstained,
         "abstention_correct": abstained if unsupported else not abstained,
         "false_answer": unsupported and not abstained,
         "false_abstention": not unsupported and abstained,
+        "answer_missing_expected": not unsupported and not abstained and not contains_expected,
         "citation_markers": sorted(markers),
         "invalid_citation_markers": invalid_markers,
         "citations_not_retrieved": sorted(cited_identities.difference(retrieved_identities)),
         "expected_evidence_cited": None if unsupported else bool(cited_identities.intersection(expected)),
+        **claim_results,
+        "unverified_claims": [claim.text[:160] for claim in claims or [] if claim.status == "unverified"],
+        "model_citation_fixes": [
+            f"{_labels(claim.model_sources)} -> {_labels(claim.sources)}: {claim.text[:100]}"
+            for claim in claims or []
+            if claim.status != "not_a_claim" and set(claim.model_sources) != set(claim.sources)
+        ],
+    }
+    row["needs_review"] = needs_review(row)
+    return row
+
+
+def _labels(numbers) -> str:
+    return "".join(f"[Source {n}]" for n in numbers) or "none"
+
+
+def needs_review(row: dict) -> bool:
+    """True when any automatic check suggests the answer may be wrong or ungrounded."""
+
+    return bool(
+        row["false_answer"]
+        or row["false_abstention"]
+        or row["answer_missing_expected"]
+        or row["invalid_citation_markers"]
+        or row["citations_not_retrieved"]
+        or row["unsupported_values"]
+        or row["weakly_supported_claims"]
+        or row.get("unverified_claims")
+        or row["expected_evidence_cited"] is False
+    )
+
+
+def summarize_answers(rows: list[dict]) -> dict:
+    """Count each failure signal across an answer run, plus which questions raised it."""
+
+    def ids(predicate) -> list[str]:
+        return [row["question_id"] for row in rows if predicate(row)]
+
+    supported = [row for row in rows if row["question_type"] != "unsupported"]
+    return {
+        "questions": len(rows),
+        "answered_supported": sum(not row["abstained"] for row in supported),
+        "supported_questions": len(supported),
+        "false_answers": ids(lambda r: r["false_answer"]),
+        "false_abstentions": ids(lambda r: r["false_abstention"]),
+        "answers_missing_expected": ids(lambda r: r["answer_missing_expected"]),
+        "invalid_citation_markers": ids(lambda r: r["invalid_citation_markers"]),
+        "unsupported_values": ids(lambda r: r["unsupported_values"]),
+        "weakly_supported_claims": ids(lambda r: r["weakly_supported_claims"]),
+        "unverified_claims": ids(lambda r: r.get("unverified_claims")),
+        "model_citation_fixes": ids(lambda r: r.get("model_citation_fixes")),
+        "expected_evidence_not_cited": ids(lambda r: r["expected_evidence_cited"] is False and not r["abstained"]),
+        "needs_review": ids(lambda r: r["needs_review"]),
     }
 
 
@@ -126,6 +253,7 @@ def manual_rubric(rows: list[dict]) -> list[dict]:
             "completeness_0_2": "",
             "citation_accuracy_0_2": "",
             "abstention_correct": row.get("abstention_correct", ""),
+            "auto_needs_review": row.get("needs_review", ""),
             "reviewer_notes": "",
         }
         for row in rows

@@ -108,6 +108,10 @@ Key mechanics worth knowing before touching retrieval or generation code:
   `RERANKER_MODEL`, cached in `storage/models/`, empty value = keep fusion order) and stores the
   fusion score as `rrf_score`. Hybrid scores are therefore cross-encoder logits, not RRF sums.
   `rerank()` takes an injectable scorer so tests never download a model.
+- **Nomic task prefixes.** `configure_llamaindex()` passes `EMBEDDING_QUERY_PREFIX`
+  (`search_query:`) and `EMBEDDING_DOCUMENT_PREFIX` (`search_document:`) to `OllamaEmbedding`, which
+  applies them on every embedding path. Both are in `vector_policy()`; clear them for embedding
+  models that don't use prefixes.
 - **Only `title` (and `topic`) metadata is embedded or BM25-indexed.** `EMBEDDED_METADATA_KEYS` in
   `ingestion/document_adapter.py`; all other metadata (hashes, IDs, location, encoding) stays on the
   node for citations and evaluation. It's part of `vector_policy()`, so changing it forces a full
@@ -116,8 +120,14 @@ Key mechanics worth knowing before touching retrieval or generation code:
   return `ABSTENTION_MESSAGE` without calling the provider; `normalize_answer()` collapses any
   answer that *starts* with the abstention message back to the exact message, even if the model
   appended more text after it. Citations (`generation/citations.py`) are built entirely from
-  retrieved Node metadata — never parsed out of model output. Read
-  `docs/grounding-abstention-citations.md` before changing prompts or the synthesizer.
+  retrieved Node metadata — never parsed out of model output. `[Source N]` markers in the answer
+  are attached by code too: `generation/attribution.py` (called from `QueryService.answer()`)
+  cites each sentence to the evidence whose text supports it, keeps the model's marker only when
+  confirmed, and labels unsupported sentences `[Unverified]`; the raw text stays in
+  `QueryResult.model_answer`. Evidence blocks in the prompt show only label, file, location, and
+  content — `number_evidence()` excludes every metadata key, or LlamaIndex prints it all into the
+  prompt (F5 in `docs/known-findings.md`). Read `docs/grounding-abstention-citations.md` before
+  changing prompts, the synthesizer, or attribution.
 - **The contract stops fabrication; it doesn't guarantee the model uses good evidence.** With
   `llama3.2:3b` and several low-relevance evidence blocks mixed in (normal at `top_k=4` on the small
   sample corpus), the model has been observed to abstain even when the correct answer was retrieved
@@ -127,8 +137,17 @@ Key mechanics worth knowing before touching retrieval or generation code:
 - **Evaluation is pair-aware.** Ground truth is `(source, location)` pairs; a correct source at the
   wrong location does not satisfy an expectation (`manual.pdf` at `page:2` != `page:7`). Retrieval
   reports compute Hit@K, Recall@K, context precision, MRR; answer reports separately track citation
-  marker validity, false answers, and false abstentions. The deterministic checks are a smoke
-  signal, not a substitute for the human 0/1/2 rubric.
+  marker validity, false answers, and false abstentions. `claim_checks()` in
+  `evaluation/evaluators.py` also checks each sentence that cites `[Source N]` against the text of
+  exactly those sources: values with units it states must appear there (`unsupported_values`), and
+  most of its content words should (`weakly_supported_claims`). `needs_review` combines every
+  signal, and `answer_summary.json` lists flagged questions per signal. Attribution and
+  `claim_checks()` share the same helpers, so code-cited sentences pass claim checks by
+  construction; the real signal is `unverified_claims`, with `model_citation_fixes` as a
+  diagnostic of the model's own citing. These checks are lexical:
+  they catch invented values and wrong-source citations, but also flag correct inferences that
+  state a value the source implies without writing it — they triage for the human 0/1/2 rubric;
+  they don't replace it.
 - **Services are the shared boundary.** `services/ingestion_service.py` and
   `services/query_service.py` are the only entry points `app.py` (Streamlit), `scripts/*.py`, and
   the evaluation runner should all go through — avoid calling `retrieval`/`generation`/`indexing`

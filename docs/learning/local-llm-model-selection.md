@@ -115,10 +115,16 @@ Then compare `evaluation/reports/<run-name>/generated_answers.csv` against
 - `false_answer` on Q016–Q018 (must stay `False`)
 - `invalid_citation_markers` (must stay empty)
 - `expected_evidence_cited` on answered questions
+- `answer_missing_expected` and `unverified_claims` (sentences no retrieved source supports;
+  citations are attached by code, so this replaces checking the model's own markers) — all
+  listed per question in `answer_summary.json` under `needs_review`
+- `model_citation_fixes`: how often the model's own `[Source N]` markers disagreed with the
+  verified citation (a diagnostic of citing skill, not shown to users)
 - `latency_seconds`
 
-Then score the answers with the human rubric in `manual_answer_evaluation.csv`. The substring check
-`answer_contains_expected` is a weak signal, especially for Q011 (a "No" answer).
+Then score the flagged answers first with the human rubric in `manual_answer_evaluation.csv`
+(`auto_needs_review` column). Re-checked against the saved `model-granite4-micro` run, these
+checks flag all 6 of its confident wrong answers, which the earlier citation-only checks passed.
 
 ### Decision rule
 
