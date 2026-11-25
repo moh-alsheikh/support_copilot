@@ -8,6 +8,10 @@ It is not "chat with your files." A complete run produces inspectable ingestion,
 retrieval indexes (semantic + keyword), grounded answers with verifiable citations, quality
 reports, and a Streamlit workbench to drive all of it.
 
+![Support Copilot RAG architecture: raw files are prepared and incrementally indexed into Chroma and BM25; a question goes through hybrid retrieval with a cross-encoder, a local LLM, and code-attached citations back to the user](docs/rag-architecture.png)
+
+<sub>Editable source: [`docs/rag-architecture.html`](docs/rag-architecture.html)</sub>
+
 ```text
 Raw multi-format files
   -> extraction/OCR -> normalized records with source + location
